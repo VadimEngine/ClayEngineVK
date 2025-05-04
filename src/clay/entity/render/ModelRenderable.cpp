@@ -1,0 +1,31 @@
+// class
+#include "clay/entity/render/ModelRenderable.h"
+
+namespace clay {
+
+ModelRenderable::ModelRenderable(Model* pModel) : BaseRenderable(),
+                                                  mModel_(pModel) {}
+
+void ModelRenderable::render(VkCommandBuffer cmdBuffer, const glm::mat4& parentModelMat) {
+    // translation matrix for position
+    glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), mPosition_);
+    //rotation matrix
+    const glm::mat4 rotationMatrix = glm::mat4_cast(mOrientation_);
+    // scale matrix
+    glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), mScale_);
+
+    glm::mat4 localModelMat = translationMat * rotationMatrix * scaleMat;
+
+    // TODO set/pass color and other uniforms here instead of in the model
+    mModel_->render(cmdBuffer, parentModelMat * localModelMat);
+}
+
+const Model* ModelRenderable::getModel() const {
+    return mModel_;
+}
+
+void ModelRenderable::setModel(Model* pModel) {
+    mModel_ = pModel;
+}
+
+} // namespace clay

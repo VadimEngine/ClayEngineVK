@@ -1,0 +1,187 @@
+#pragma once
+#ifdef CLAY_PLATFORM_DESKTOP
+
+// standard lib
+#include <stdexcept>
+#include <vector>
+#include <array>
+#include <optional>
+// third party
+#include <vulkan/vulkan.h>
+// clay
+#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/gui/desktop/Window.h"
+#include "clay/utils/common/Utils.h"
+
+namespace clay {
+
+struct QueueFamilyIndices {
+    std::optional<uint32_t> graphicsFamily;
+    std::optional<uint32_t> presentFamily;
+
+    inline bool isComplete() {
+        return graphicsFamily.has_value();
+    }
+};
+
+struct SwapChainSupportDetails {
+    VkSurfaceCapabilitiesKHR capabilities;
+    std::vector<VkSurfaceFormatKHR> formats;
+    std::vector<VkPresentModeKHR> presentModes;
+};
+
+class GraphicsContextDesktop : public IGraphicsContext {
+public:
+    
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
+    GraphicsContextDesktop(Window& window);
+
+    ~GraphicsContextDesktop();
+
+    void initialize(Window& window);
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* pUserData);
+
+    void setupDebugMessenger();
+
+    void setSurface(VkSurfaceKHR surface);
+
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+
+    bool isDeviceSuitable(VkPhysicalDevice device);
+
+    void createLogicalDevice();
+
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+
+    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+
+    std::vector<const char*> getRequiredExtensions();
+
+    bool checkValidationLayerSupport();
+
+    void createInstance();
+
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) override;
+
+    void createDescriptorPool();
+
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) override;
+
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) override;
+
+    void createImage(uint32_t width,
+                     uint32_t height,
+                     uint32_t mipLevels, 
+                     VkSampleCountFlagBits numSamples, 
+                     VkFormat format, 
+                     VkImageTiling tiling, 
+                     VkImageUsageFlags usage, 
+                     VkMemoryPropertyFlags properties, 
+                     VkImage& image, 
+                     VkDeviceMemory& imageMemory) override;
+
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) override;
+
+    VkSampleCountFlagBits getMaxUsableSampleCount();
+
+    void pickPhysicalDevice();
+
+    VkCommandBuffer beginSingleTimeCommands();
+
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+    VkShaderModule createShaderModule(const utils::FileData& file);
+
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) override;
+
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) override;
+
+    void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+
+    void createRenderPass();
+
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+
+    VkFormat findDepthFormat();
+
+    void createCommandPool();
+
+    void createSwapChain(Window& mWindow);
+
+    void createFramebuffers();
+
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, Window& window);
+
+    void recreateSwapChain(Window& window);
+
+    void cleanupSwapChain();
+
+    void createImageViews();
+
+    void createColorResources();
+
+    void createDepthResources();
+
+    void createSyncObjects();
+
+    bool hasStencilComponent(VkFormat format);
+
+    void cleanUp();
+
+    VkSampler createSampler() override;
+
+    void populateImage(VkImage image, utils::ImageData& imageData) override;
+
+    VkShaderModule createShader(const ShaderCreateInfo& shaderCI) override;
+
+
+public:
+
+    VkSurfaceKHR mSurface_;
+
+    VkDebugUtilsMessengerEXT mDebugMessenger_; // TODO debug might need to go in the app instead of graphics
+    VkQueue mGraphicsQueue_;
+    uint32_t mCurrentFrame_ = 0;
+
+    VkSampleCountFlagBits mMSAASamples_ = VK_SAMPLE_COUNT_1_BIT;
+
+    VkQueue mPresentQueue_;
+
+    VkImage mColorImage_;
+    VkDeviceMemory mColorImageMemory_;
+    VkImageView mColorImageView_;
+
+    VkImage mDepthImage_;
+    VkDeviceMemory mDepthImageMemory_;
+    VkImageView mDepthImageView_;
+
+    VkSwapchainKHR mSwapChain_;
+    std::vector<VkImage> mSwapChainImages_;
+    VkExtent2D mSwapChainExtent_;
+
+    VkFormat mSwapChainImageFormat_;
+
+    std::vector<VkImageView> mSwapChainImageViews_;
+    std::vector<VkFramebuffer> mSwapChainFramebuffers_;
+
+    std::vector<VkSemaphore> mImageAvailableSemaphores_;
+    std::vector<VkSemaphore> mRenderFinishedSemaphores_;
+    std::vector<VkFence> mInFlightFences_;
+
+};
+
+} // namespace clay
+
+#endif // CLAY_PLATFORM_DESKTOP
