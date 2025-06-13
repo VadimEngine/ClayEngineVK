@@ -51,7 +51,7 @@ protected:
     glm::vec3 mPosition_ = {0.0f, 0.0f, 0.0f};;
     glm::quat mOrientation_ = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 mScale_ { 1.0f, 1.0f, 1.0f };;
-
+    // TODO use this
     bool mEnabled_ = true;
 };
 

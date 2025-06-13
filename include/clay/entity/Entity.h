@@ -58,6 +58,7 @@ protected:
     glm::quat mOrientation_ = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 mScale_;
 
+    // TODO unique ptr
     std::vector<BaseRenderable*> mRenderables_;
 
     bool mEnabled_ = true;

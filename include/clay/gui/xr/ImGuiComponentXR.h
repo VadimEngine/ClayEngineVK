@@ -1,7 +1,7 @@
 #pragma once
 #ifdef CLAY_PLATFORM_XR
 // clay
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 
 // third party
 #include "imgui.h"
@@ -25,7 +25,7 @@ public:
 
     void render();
 
-    static IGraphicsContext* gGraphicsContext_;
+    static BaseGraphicsContext* gGraphicsContext_;
     static VkDescriptorPool gImguiDescriptorPool_;
 };
 } // namespace clay

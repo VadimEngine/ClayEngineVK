@@ -2,11 +2,16 @@
 // standard lib
 #include <unordered_map>
 #include <array>
+// third party
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/glm.hpp>
 // clay
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/utils/common/Utils.h"
 #include "clay/graphics/common/PipelineResource.h"
 #include "clay/graphics/common/Material.h"
+#include "clay/graphics/common/UniformBuffer.h"
 
 namespace clay {
 
@@ -20,11 +25,6 @@ public:
         uint32_t advance;      // horizontal advance in pixels (usually in 1/64th pixels, convert as needed)
     };
 
-    struct CameraConstant {
-        glm::mat4 view;
-        glm::mat4 proj;
-    };
-
     struct FontVertex {
         glm::vec4 vertex;    // xy = position, zw = texCoord
         int glyphIndex;
@@ -34,22 +34,22 @@ public:
         static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
     };
 
+    Font(BaseGraphicsContext& graphicsAPI, utils::FileData& fontFileData, utils::FileData& vertexFileData, utils::FileData& fragmentFileData, UniformBuffer& uniformBuffer);
 
-    Font(IGraphicsContext& graphicsAPI, utils::FileData& fileData, utils::FileData& vertexFileData, utils::FileData& fragmentFileData);
+    const PipelineResource& getPipeline() const;
+
+    const Material& getMaterial() const;
 
     ~Font();
 
-    void createPipeline(utils::FileData& vertexFileData, utils::FileData& fragmentFileData);
+    const CharacterInfo& getCharacterInfo(char c) const;
 
-    void createVertexBuffer();
+private:
+    void createPipeline(utils::FileData& vertexFileData, utils::FileData& fragmentFileData, UniformBuffer& uniformBuffer);
 
-    void initTemp(const std::string& str);
+    BaseGraphicsContext& mGContext_;
 
-    void render(VkCommandBuffer cmdBuffer);
-
-    glm::mat4 getModelMatrix();
-
-    IGraphicsContext& mGContext_;
+    VkSampler mSampler_;
 
     std::array<CharacterInfo, 128> mCharacterFrontInfo_;
 
@@ -57,20 +57,8 @@ public:
     std::array<VkDeviceMemory, 128> mCharacterMemory_;
     std::array<VkImageView, 128> mCharacterImageView_;
 
-    PipelineResource* mPipeline_;
-    Material* mMaterial_;
-
-    VkBuffer mVertexBuffer_;
-    VkDeviceMemory mVertexBufferMemory_;
-    std::vector<FontVertex> mVertices_;
-
-    glm::vec3 mPosition_ = {0.0f, 0.0f, 0.0f};
-    glm::vec3 mRotation_ = { 0.0f, 0.0f, 0.0f };
-    glm::vec3 mScale_ = { 1.0f, 1.0f, 1.0f };
-
-    std::string mString_;
-
-
+    std::unique_ptr<PipelineResource> mPipeline_;
+    std::unique_ptr<Material> mMaterial_;
 };
 
 } // namespace clay

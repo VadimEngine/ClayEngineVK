@@ -4,17 +4,15 @@
 // clay
 #include "clay/graphics/common/Font.h"
 #include "clay/entity/render/BaseRenderable.h"
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 
 namespace clay {
 
 class TextRenderable : public BaseRenderable {
 public:
-    TextRenderable(IGraphicsContext& gContext, const std::string& text = "", Font* font = nullptr);
+    TextRenderable(BaseGraphicsContext& gContext, const std::string& text = "", Font* font = nullptr);
 
     ~TextRenderable();
-
-    void initialize();
 
     void createVertexBuffer();
 
@@ -22,9 +20,12 @@ public:
 
     glm::mat4 getModelMatrix();
 
+    void setColor(const glm::vec4 newColor);
+
     // logic to change font and text?
 
-    IGraphicsContext& mGraphicsContext_;
+private:
+    BaseGraphicsContext& mGraphicsContext_;
 
     std::string mText_;
     Font* mpFont_;
@@ -34,12 +35,6 @@ public:
     std::vector<Font::FontVertex> mVertices_;
 
     glm::vec4 mColor_ = {1.0f, 1.0f, 1.0f, 1.0f};
-    // TODO use transforms from BaseRenderable instead
-    glm::vec3 mPosition_ = {0.0f, 0.0f, 0.0f};
-    glm::vec3 mRotation_ = { 0.0f, 0.0f, 0.0f };
-    glm::vec3 mScale_ = { 1.0f, 1.0f, 1.0f };
-
-
 };
 
 } // namespace clay

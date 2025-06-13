@@ -21,6 +21,7 @@ public:
 
 private:
     Model* mModel_;
+    glm::vec4 mColor_ = {1,1,1,1};
 };
 
 } // namespace clay

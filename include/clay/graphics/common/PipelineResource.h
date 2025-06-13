@@ -3,62 +3,53 @@
 #include <vector>
 #include <array>
 // clay
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 
 namespace clay {
 
 class PipelineResource {
 public:
 
-    struct BufferCreateInfo {
-        VkBufferUsageFlags usage;
-        size_t stride;
-        size_t size;
-        void* data;
-        VkShaderStageFlags stageFlags;
-        VkDescriptorType descriptorType;
-        uint32_t binding;
+    struct DescriptorSetLayoutInfo {
+        std::vector<VkDescriptorSetLayoutBinding> bindings;
     };
 
-//    struct ImageCreateInfo {
-//        void* data;
-//        VkShaderStageFlags stageFlags;
-//        VkDescriptorType descriptorType;
-//        uint32_t binding;
-//    };
-
-    struct PipelineConfig {
-        IGraphicsContext& graphicsContext;
-
+    struct PipelineLayoutInfo {
         std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-
         VkVertexInputBindingDescription vertexInputBindingDescription;
-
         std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
-
-        std::vector<VkPushConstantRange> pushConstants;
-
-        std::vector<BufferCreateInfo> bufferCreateInfos;
-
-        std::vector<VkDescriptorSetLayoutBinding> imageCreateInfos;
-
         VkPipelineDepthStencilStateCreateInfo depthStencilState;
-
         VkPipelineRasterizationStateCreateInfo rasterizerState;
+        std::vector<VkPushConstantRange> pushConstants;
     };
 
-    IGraphicsContext& mGraphicsContext_;
-    VkPipelineLayout mPipelineLayout_;
-    VkPipeline mPipeline_;
-    VkDescriptorSetLayout mDescriptorSetLayout_;
+    struct PipelineConfig { // TODO group into descriptor set and pipeline for clarity
+        BaseGraphicsContext& graphicsContext;
+        PipelineLayoutInfo pipelineLayoutInfo;
+        DescriptorSetLayoutInfo bindingLayoutInfo;
+    };
 
     PipelineResource(const PipelineConfig& config);
 
     ~PipelineResource();
 
+    const VkPipelineLayout& getPipelineLayout() const;
+
+    const VkPipeline& getPipeline() const;
+
+    const VkDescriptorSetLayout& getDescriptorSetLayout() const;
+
+private:
     void createDescriptorSetLayout(const PipelineConfig& config);
 
     void createPipeline(const PipelineConfig& config);
+
+    void finalize();
+
+    BaseGraphicsContext& mGraphicsContext_;
+    VkPipelineLayout mPipelineLayout_;
+    VkPipeline mPipeline_;
+    VkDescriptorSetLayout mDescriptorSetLayout_;
 };
 
 } // namespace clay

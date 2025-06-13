@@ -1,44 +1,35 @@
 #pragma once
+// standard lib
 #include <vector>
 // clay
-#include "clay/utils/common/Utils.h"
 #include "clay/graphics/common/Material.h"
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/graphics/common/Camera.h"
 #include "clay/graphics/common/Mesh.h"
-
+#include "clay/utils/common/Utils.h"
 
 namespace clay {
 
 class Model {
 
 public:
-    Model(IGraphicsContext& gContext);
+    struct ModelElement {
+        Mesh* mesh;
+        Material* material;
+        glm::mat4 localTransform = glm::mat4(1);
+    };
+
+    Model(BaseGraphicsContext& gContext);
 
     ~Model();
 
-    void parseModelFile(utils::FileData& fileData);
+    void addElement(const ModelElement& element);
 
-    void render(VkCommandBuffer cmdBuffer, const glm::mat4& parentModelMat);
+    void render(VkCommandBuffer cmdBuffer, const void* userPushData, uint32_t userPushSize);
 
-    void update(float dt);
-
-    glm::mat4 getModelMatrix();
-
-
-public:
-
-    IGraphicsContext& mGraphicsContext_;
-
-    // for now just hold keep material and mesh list index matching
-    std::vector<Mesh*> mMeshes_;
-    std::vector<Material*> mMaterials_;
-
-    glm::vec4 mColor_ = {1.0f, 1.0f, 1.0f, 1.0f};
-
-    glm::vec3 mPosition_ = {0.0f, 0.0f, 0.0f};
-    glm::vec3 mRotation_ = { 0.0f, 0.0f, 0.0f }; // TODO replace with orientation
-    glm::vec3 mScale_ = { 1.0f, 1.0f, 1.0f };
+private:
+    BaseGraphicsContext& mGraphicsContext_;
+    std::vector<ModelElement> mModelGroups_;
 };
 
 } // namespace clay

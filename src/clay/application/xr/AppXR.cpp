@@ -736,8 +736,8 @@ bool AppXR::RenderLayer(RenderLayerInfo &renderLayerInfo) {
     mScenes_.front()->update(0);
     // draw imgui onto a different frame buffer
 
-    vkWaitForFences(mpGraphicsContextXR_->mDevice_, 1, &mpGraphicsContextXR_->fence, true, UINT64_MAX);
-    if (vkResetFences(mpGraphicsContextXR_->mDevice_, 1, &mpGraphicsContextXR_->fence) != VK_SUCCESS) {
+    vkWaitForFences(mpGraphicsContextXR_->getDevice(), 1, &mpGraphicsContextXR_->fence, true, UINT64_MAX);
+    if (vkResetFences(mpGraphicsContextXR_->getDevice(), 1, &mpGraphicsContextXR_->fence) != VK_SUCCESS) {
         throw std::runtime_error("Failed to reset fence");
     }
 
@@ -966,7 +966,7 @@ void AppXR::InitImguiRender() {
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = 1;
 
-    if (vkAllocateCommandBuffers(mpGraphicsContext_->mDevice_, &allocInfo, &imguiCommandBuffer) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(mpGraphicsContext_->getDevice(), &allocInfo, &imguiCommandBuffer) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate command buffers!");
     }
 
@@ -1007,7 +1007,7 @@ void AppXR::InitImguiRender() {
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(mpGraphicsContext_->mDevice_, &renderPassInfo, nullptr, &mpGraphicsContextXR_->imguiRenderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(mpGraphicsContext_->getDevice(), &renderPassInfo, nullptr, &mpGraphicsContextXR_->imguiRenderPass) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass");
     }
 
@@ -1050,7 +1050,7 @@ void AppXR::InitImguiRender() {
     framebufferInfo.height = imguiHeight;
     framebufferInfo.layers = 1;  // usually 1 unless rendering to a 3D image or array layers
 
-    if (vkCreateFramebuffer(mpGraphicsContext_->mDevice_, &framebufferInfo, nullptr, &imguiFrameBuffer) != VK_SUCCESS) {
+    if (vkCreateFramebuffer(mpGraphicsContext_->getDevice(), &framebufferInfo, nullptr, &imguiFrameBuffer) != VK_SUCCESS) {
         throw std::runtime_error("failed to create framebuffer!");
     }
 }

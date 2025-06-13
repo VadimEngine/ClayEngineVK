@@ -8,12 +8,12 @@
 #include <android_native_app_glue.h>
 #include <vulkan/vulkan.h>
 // OpenXR Helper
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/utils/xr/UtilsXR.h"
 
 namespace clay {
 
-class GraphicsContextXR : public IGraphicsContext {
+class GraphicsContextXR : public BaseGraphicsContext {
 public:
     // Pipeline Helpers
     enum class SwapchainType : uint8_t {
@@ -246,8 +246,6 @@ public:
 
     VkImage GetSwapchainImage(XrSwapchain swapchain, uint32_t index);
 
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) override;
-
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) override;
 
     void createImage(uint32_t width,
@@ -261,15 +259,7 @@ public:
                     VkImage& image,
                     VkDeviceMemory& imageMemory) override;
 
-    VkSampler createSampler() override;
-
-    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) override;
-
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
-
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-
-    void populateImage(VkImage image, utils::ImageData& imageData) override;
 
     VkShaderModule createShader(const ShaderCreateInfo& shaderCI) override;
 
@@ -322,10 +312,6 @@ public:
     const std::vector <int64_t> GetSupportedColorSwapchainFormats();
 
     const std::vector <int64_t> GetSupportedDepthSwapchainFormats();
-
-    VkCommandBuffer beginSingleTimeCommands();
-
-    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
     void setupDebugMessenger();
 

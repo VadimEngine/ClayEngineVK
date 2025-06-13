@@ -777,65 +777,6 @@ XrSwapchainImageBaseHeader* GraphicsContextXR::AllocateSwapchainImageData(XrSwap
     return reinterpret_cast<XrSwapchainImageBaseHeader *>(swapchainImagesMap[swapchain].second.data());
 }
 
-void GraphicsContextXR::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = usage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateBuffer(mDevice_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create buffer!");
-    }
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(mDevice_, buffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-
-    if (vkAllocateMemory(mDevice_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate buffer memory!");
-    }
-
-    vkBindBufferMemory(mDevice_, buffer, bufferMemory, 0);
-}
-
-VkCommandBuffer GraphicsContextXR::beginSingleTimeCommands() {
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = mCommandPool_;
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(mDevice_, &allocInfo, &commandBuffer);
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-    return commandBuffer;
-}
-
-void GraphicsContextXR::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
-    vkEndCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    vkQueueSubmit(mQueue_, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(mQueue_);
-
-    vkFreeCommandBuffers(mDevice_, mCommandPool_, 1, &commandBuffer);
-}
-
 void GraphicsContextXR::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -889,56 +830,6 @@ void GraphicsContextXR::createImage(uint32_t width,
     }
 
     vkBindImageMemory(mDevice_, image, imageMemory, 0);
-}
-
-VkImageView GraphicsContextXR::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) {
-    VkImageViewCreateInfo viewInfo{};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = mipLevels;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
-
-    VkImageView imageView;
-    if (vkCreateImageView(mDevice_, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create texture image view!");
-    }
-
-    return imageView;
-}
-
-VkSampler GraphicsContextXR::createSampler() {
-    VkSampler sampler;
-
-    VkPhysicalDeviceProperties properties{};
-    vkGetPhysicalDeviceProperties(mPhysicalDevice_, &properties);
-
-    VkSamplerCreateInfo samplerInfo{};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_NEAREST;
-    samplerInfo.minFilter = VK_FILTER_NEAREST;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 1; //properties.limits.maxSamplerAnisotropy;
-    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    samplerInfo.minLod = 0.0f; // static_cast<float>(mipLevels / 2);
-    samplerInfo.maxLod = 0.0f;// static_cast<float>(1); // static_cast<float>(mMipLevels_);
-    samplerInfo.mipLodBias = 0.0f;
-
-    if (vkCreateSampler(mDevice_, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create texture sampler!");
-    }
-    return sampler;
 }
 
 void GraphicsContextXR::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
@@ -1006,75 +897,15 @@ void GraphicsContextXR::transitionImageLayout(VkImage image, VkFormat format, Vk
     endSingleTimeCommands(commandBuffer);
 }
 
-void GraphicsContextXR::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {
-        width,
-        height,
-        1
-    };
-
-    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-    endSingleTimeCommands(commandBuffer);
-}
-
-void GraphicsContextXR::populateImage(VkImage image, utils::ImageData& imageData) {
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(
-        imageData.width * imageData.height * imageData.channels,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer,
-        stagingBufferMemory
-    );
-
-    VkDeviceSize imageSize = imageData.width * imageData.height * imageData.channels;
-
-    void* data;
-    vkMapMemory(mDevice_, stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, imageData.pixels.get(), static_cast<size_t>(imageSize));
-    vkUnmapMemory(mDevice_, stagingBufferMemory);
-
-    transitionImageLayout(
-        image,
-        VK_FORMAT_R8G8B8A8_SRGB, // TODO this should be a parameter
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1
-    );
-
-    copyBufferToImage(
-        stagingBuffer,
-        image,
-        static_cast<uint32_t>(imageData.width),
-        static_cast<uint32_t>(imageData.height)
-    );
-
-    vkDestroyBuffer(mDevice_, stagingBuffer, nullptr);
-    vkFreeMemory(mDevice_, stagingBufferMemory, nullptr);
-}
-
 VkImageView GraphicsContextXR::CreateImageView(const ImageViewCreateInfo &imageViewCI) {
     VkImageView imageView{};
     VkImageViewCreateInfo vkImageViewCI;
     vkImageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     vkImageViewCI.pNext = nullptr;
     vkImageViewCI.flags = 0;
-    vkImageViewCI.image = (VkImage)imageViewCI.image;
+    vkImageViewCI.image = imageViewCI.image;
     vkImageViewCI.viewType = VkImageViewType(imageViewCI.view);
-    vkImageViewCI.format = (VkFormat)imageViewCI.format;
+    vkImageViewCI.format = imageViewCI.format;
     vkImageViewCI.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
     vkImageViewCI.subresourceRange.aspectMask = VkImageAspectFlagBits(imageViewCI.aspect);
     vkImageViewCI.subresourceRange.baseMipLevel = imageViewCI.baseMipLevel;
@@ -1092,22 +923,6 @@ void GraphicsContextXR::DestroyImageView(VkImageView& imageView) {
     imageViewResources.erase(imageView);
     imageView = nullptr;
 }
-
-VkShaderModule GraphicsContextXR::createShader(const ShaderCreateInfo& shaderCI) {
-    VkShaderModule shaderModule{};
-    VkShaderModuleCreateInfo shaderModuleCI;
-    shaderModuleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    shaderModuleCI.pNext = nullptr;
-    shaderModuleCI.flags = 0;
-    shaderModuleCI.codeSize = static_cast<uint32_t>(shaderCI.sourceSize);
-    shaderModuleCI.pCode = reinterpret_cast<const uint32_t *>(shaderCI.sourceData);
-    VULKAN_CHECK(
-        vkCreateShaderModule(mDevice_, &shaderModuleCI, nullptr, &shaderModule),
-        "Failed to create ShaderModule."
-    )
-
-    return shaderModule;
-};
 
 void GraphicsContextXR::BeginRendering() {
     VULKAN_CHECK(

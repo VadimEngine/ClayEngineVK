@@ -1,24 +1,33 @@
 #pragma once
 // clay
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/utils/common/Utils.h"
 
 namespace clay {
 
 class Texture {
 public:
-    Texture(IGraphicsContext& gContext);
+    Texture(BaseGraphicsContext& gContext);
+
+    ~Texture();
 
     void initialize(utils::ImageData& imageData);
 
     void setSampler(VkSampler sampler);
 
-    IGraphicsContext& mGraphicsContext_;
+    VkImageView getImageView() const;
+
+    VkSampler getSampler() const;
+    
+    void finalize();
+
+private:
+    BaseGraphicsContext& mGraphicsContext_;
 
     VkImage mImage_;
     VkDeviceMemory mImageMemory_;
     VkImageView mImageView_;
-    VkSampler mSampler_;
+    VkSampler mSampler_; // does not own
 
 };
 

@@ -4,25 +4,27 @@
 
 // standard lib
 #include <utility>
+#include <optional>
 // third party
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 // clay
-#include "clay/application/desktop/InputHandlerDesktop.h"
+#include <clay/application/desktop/InputHandlerDesktop.h>
 
 namespace clay {
 
-
 class Window {
 public:
-    Window();
+    enum class WindowEvent {
+        RESIZED, CLOSED, FOCUS_GAINED, FOCUS_LOST
+    };
+
+    Window(int width = DEFAULT_WIDTH, int height = DEFAULT_HEIGHT);
 
     ~Window();
 
     void update(float dt);
-
-    void render();
 
     std::pair<int, int> getDimensions() const;
 
@@ -32,20 +34,23 @@ public:
 
     VkSurfaceKHR createSurface(VkInstance& instance);
 
-    InputHandlerDesktop* getInputHandler();
+    void pushEvent(WindowEvent evt);
+
+    std::optional<WindowEvent> pollEvent();
+
+    InputHandlerDesktop& getInputHandler();
 
 private:
     /** Default Screen Width */
-    static constexpr unsigned int SCR_WIDTH = 800;
+    static constexpr unsigned int DEFAULT_WIDTH = 800;
     /** Default Screen Height */
-    static constexpr unsigned int SCR_HEIGHT = 600;
+    static constexpr unsigned int DEFAULT_HEIGHT = 600;
     /** GLFW window this window wraps */
     GLFWwindow* mpGLFWWindow_ = nullptr;
-    /** Input handler listening to inputs on this window*/
+    /** Input handler listening to Mouse/Keyboard inputs on this window*/
     InputHandlerDesktop mInputHandler_;
-
-    /** GLFW swap interval for VSync */
-    unsigned int mSwapInterval_ = 1;
+    /** Queue to hold window events such as resize, close, focus lost/gain */
+    std::queue<WindowEvent> mWindowEventQueue_;
 };
 
 } // namespace clay

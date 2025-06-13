@@ -4,21 +4,16 @@
 // third party
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-// assimp TODO move these to cpp
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 // clay
 #include "clay/utils/common/Utils.h"
 #include "clay/graphics/common/Material.h"
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/graphics/common/Camera.h"
 
 namespace clay {
 
 class Mesh {
 public:
-
     struct Vertex {
         glm::vec3 position;
         glm::vec3 normal;
@@ -31,35 +26,44 @@ public:
         static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions();
     };
 
-    static void parseObjFile(IGraphicsContext& gContext, utils::FileData& fileData, std::vector<Mesh>& meshList);
+    static void parseObjFile(BaseGraphicsContext& gContext, utils::FileData& fileData, std::vector<Mesh>& meshList);
 
-    static void processNode(IGraphicsContext& gContext, aiNode *node, const aiScene *scene, std::vector<Mesh>& meshList);
+    Mesh(BaseGraphicsContext& gContext);
 
-    static Mesh processMesh(IGraphicsContext& graphicsAPI, aiMesh *mesh, const aiScene *scene);
+    Mesh(BaseGraphicsContext& gContext, const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);
 
-    Mesh(IGraphicsContext& gContext);
+    // move constructor
+    Mesh(Mesh&& other) noexcept;
 
-    Mesh(IGraphicsContext& gContext, const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);
-
-
+    // move assignment
+    Mesh& operator=(Mesh&& other) noexcept;
+    
     ~Mesh();
 
-    void createVertexBuffer();
+    void bindMesh(VkCommandBuffer cmdBuffer);
 
-    void createIndexBuffer();
+    VkBuffer getVertexBuffer() const;
+
+    VkBuffer getIndexBuffer() const;
+
+    uint32_t getIndicesCount() const;
+
+
+private:
+    void createVertexBuffer(const std::vector<Vertex>& vertices);
+
+    void createIndexBuffer(const std::vector<unsigned int>& indices);
+
+    void finalize();
 
     // private:
-    IGraphicsContext& mGraphicsContext_;
+    BaseGraphicsContext& mGraphicsContext_;
 
-    std::vector<Vertex> mVertices_;
-    std::vector<uint32_t> mIndices_;
-
-    VkBuffer mVertexBuffer_;
-    VkDeviceMemory mVertexBufferMemory_;
-    VkBuffer mIndexBuffer_;
-    VkDeviceMemory mIndexBufferMemory_;
-
-
+    uint32_t mIndicesCount_ = 0;
+    VkBuffer mVertexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory mVertexBufferMemory_ = VK_NULL_HANDLE;
+    VkBuffer mIndexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory mIndexBufferMemory_ = VK_NULL_HANDLE;
 };
 
 } // namespace clay

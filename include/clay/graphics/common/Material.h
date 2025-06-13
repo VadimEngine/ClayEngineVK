@@ -3,51 +3,54 @@
 #include <vector>
 #include <array>
 // clay
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/graphics/common/PipelineResource.h"
+#include "clay/graphics/common/UniformBuffer.h"
 
 namespace clay {
 
 class Material {
 public:
+    struct BufferBindingInfo {
+        VkBuffer buffer;
+        VkDeviceSize size;
+        uint32_t binding;
+        VkDescriptorType descriptorType;
+    };
 
+    struct ImageBindingInfo {
+        VkSampler sampler;
+        VkImageView imageView;
+        uint32_t binding;
+        VkDescriptorType descriptorType;
+    };
+
+    // TODO this could be used to tell the material to make its own uniforms
     struct BufferCreateInfo {
         VkBufferUsageFlags usage;
         size_t stride;
         size_t size;
-        void* data;
         VkShaderStageFlags stageFlags;
         VkDescriptorType descriptorType;
-        uint32_t binding;
-    };
-
-    struct ImageCreateInfo {
-        void* data;
-        VkShaderStageFlags stageFlags;
-        VkDescriptorType descriptorType;
-        VkImageView imageView;
-        VkSampler sampler;
         uint32_t binding;
     };
 
     struct MaterialConfig {
-        IGraphicsContext& graphicsContext;
-
+        BaseGraphicsContext& graphicsContext;
         PipelineResource& pipelineResource;
 
-        std::vector<BufferCreateInfo> bufferCreateInfos;
-
-        std::vector<ImageCreateInfo> imageCreateInfos;
-
-        std::vector<ImageCreateInfo> imageCreateInfosArray;
-
+        std::vector<BufferBindingInfo> bufferBindings;
+        std::vector<ImageBindingInfo> imageBindings;
+        std::vector<ImageBindingInfo> imageArrayBindings;
     };
 
     Material(const MaterialConfig& config);
 
     ~Material();
 
-    void createDescriptorSet(const MaterialConfig& config);
+    void bindMaterial(VkCommandBuffer cmdBuffer) const;
+
+    void pushConstants(VkCommandBuffer cmdBuffer, const void* data, uint32_t size, VkShaderStageFlags stageFlags) const;
 
     VkPipeline getPipeline() const;
 
@@ -55,14 +58,16 @@ public:
 
     VkDescriptorSetLayout getDescriptorSetLayout() const;
 
-    IGraphicsContext& mGraphicsContext_;
-    PipelineResource& mPipelineResource_;
+    const VkDescriptorSet& getDescriptorSet() const;
+    
+private:
+    void createDescriptorSet(const MaterialConfig& config);
 
+    BaseGraphicsContext& mGraphicsContext_;
+    PipelineResource& mPipelineResource_;
     VkDescriptorSet mDescriptorSet_;
 
-    std::vector<VkBuffer> mUniformBuffers_;
-    std::vector<VkDeviceMemory> mUniformBuffersMemory_;
-    std::vector<void*> mUniformBuffersMapped_;
+    std::vector<UniformBuffer> mUniformBuffers_;
 };
 
 } // namespace clay

@@ -4,7 +4,7 @@
 #include <list>
 // clay
 #include "clay/graphics/xr/GraphicsContextXR.h"
-#include "clay/application/common/IApp.h"
+#include "clay/application/common/BaseApp.h"
 #include "clay/application/common/BaseScene.h"
 #include "clay/utils/xr/UtilsXR.h"
 #include "clay/application/xr/InputHandlerXR.h"
@@ -14,7 +14,7 @@
 
 namespace clay {
 
-class AppXR : public IApp {
+class AppXR : public BaseApp {
 public:
     // Custom data structure that is used by PollSystemEvents().
     struct AndroidAppState {

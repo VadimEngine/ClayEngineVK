@@ -3,7 +3,6 @@
 
 namespace clay {
 
-
 InputHandlerDesktop::KeyEvent::KeyEvent(Type type, unsigned int code)
     : mType_(type), mCode_(code) {
 }
