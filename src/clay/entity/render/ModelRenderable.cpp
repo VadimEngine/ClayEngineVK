@@ -35,4 +35,8 @@ void ModelRenderable::setModel(Model* pModel) {
     mModel_ = pModel;
 }
 
+void ModelRenderable::setColor(const glm::vec4 newColor) {
+    mColor_ = newColor;
+}
+
 } // namespace clay

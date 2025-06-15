@@ -50,7 +50,7 @@ void ImGuiComponentXR::initialize(ANativeWindow* pWindow) {
     init_info.Instance = gGraphicsContext_->getInstance();
     init_info.PhysicalDevice = gGraphicsContext_->mPhysicalDevice_;
     init_info.Device = gGraphicsContext_->getDevice();
-    init_info.Queue = gGraphicsContext_->mQueue_;
+    init_info.Queue = gGraphicsContext_->mGraphicsQueue_;
     init_info.DescriptorPool = gImguiDescriptorPool_;
     init_info.MinImageCount = 2;
     init_info.ImageCount = 2;

@@ -76,7 +76,6 @@ public:
     VkDescriptorPool mDescriptorPool_ = VK_NULL_HANDLE;
     VkCommandPool mCommandPool_ = VK_NULL_HANDLE;
     VkQueue mGraphicsQueue_ = VK_NULL_HANDLE;
-    VkQueue mQueue_{}; // todo this might need to get removed
 };
 
 } // namespace clay

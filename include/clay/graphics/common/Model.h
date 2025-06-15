@@ -16,7 +16,7 @@ public:
     struct ModelElement {
         Mesh* mesh;
         Material* material;
-        glm::mat4 localTransform = glm::mat4(1);
+        glm::mat4 localTransform = glm::mat4(1); // TODO maybe replace with instance data(mode, color) that is dynamically sized
     };
 
     Model(BaseGraphicsContext& gContext);

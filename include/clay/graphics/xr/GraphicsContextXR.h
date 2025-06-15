@@ -10,6 +10,7 @@
 // OpenXR Helper
 #include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/utils/xr/UtilsXR.h"
+#include "clay/graphics/common/UniformBuffer.h"
 
 namespace clay {
 
@@ -225,8 +226,6 @@ public:
 
     ~GraphicsContextXR();
 
-    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-
     void CreateRenderPass(const std::vector <int64_t> &colorFormats, int64_t depthFormat);
 
     int64_t SelectColorSwapchainFormat(const std::vector <int64_t> &formats);
@@ -245,23 +244,6 @@ public:
     XrSwapchainImageBaseHeader *GetSwapchainImageData(XrSwapchain swapchain, uint32_t index);
 
     VkImage GetSwapchainImage(XrSwapchain swapchain, uint32_t index);
-
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) override;
-
-    void createImage(uint32_t width,
-                    uint32_t height,
-                    uint32_t mipLevels,
-                    VkSampleCountFlagBits numSamples,
-                    VkFormat format,
-                    VkImageTiling tiling,
-                    VkImageUsageFlags usage,
-                    VkMemoryPropertyFlags properties,
-                    VkImage& image,
-                    VkDeviceMemory& imageMemory) override;
-
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
-
-    VkShaderModule createShader(const ShaderCreateInfo& shaderCI) override;
 
     void BeginRendering();
 
@@ -317,10 +299,7 @@ public:
 
     bool checkValidationLayerSupport();
 
-
 //private:
-    // VkInstance mInstance_{};
-
     uint32_t queueFamilyIndex = 0xFFFFFFFF;
     uint32_t queueIndex = 0xFFFFFFFF;
     VkFence fence{};
@@ -361,6 +340,9 @@ public:
     std::vector <std::tuple<VkWriteDescriptorSet, VkDescriptorBufferInfo, VkDescriptorImageInfo>> writeDescSets;
 
     VkRenderPass imguiRenderPass = VK_NULL_HANDLE;
+
+    std::unique_ptr<UniformBuffer> mWorldLockedCameraUniform_;
+    std::unique_ptr<UniformBuffer> mHeadLockedCameraUniform_;
 };
 
 } // namespace clay

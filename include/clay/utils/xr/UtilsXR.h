@@ -22,6 +22,7 @@
 #include <android/asset_manager.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
+#include <glm/glm.hpp>
 // clay
 #include "clay/utils/common/Utils.h"
 // Debugbreak
