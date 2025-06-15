@@ -7,7 +7,7 @@
 
 namespace clay {
 
-IGraphicsContext* ImGuiComponentXR::gGraphicsContext_ = nullptr;
+BaseGraphicsContext* ImGuiComponentXR::gGraphicsContext_ = nullptr;
 VkDescriptorPool ImGuiComponentXR::gImguiDescriptorPool_{};
 
 
@@ -36,7 +36,7 @@ void ImGuiComponentXR::initialize(ANativeWindow* pWindow) {
     pool_info.poolSizeCount = std::size(pool_sizes);
     pool_info.pPoolSizes = pool_sizes;
 
-    vkCreateDescriptorPool(gGraphicsContext_->mDevice_, &pool_info, nullptr, &gImguiDescriptorPool_);
+    vkCreateDescriptorPool(gGraphicsContext_->getDevice(), &pool_info, nullptr, &gImguiDescriptorPool_);
 
     //this initializes the core structures of imgui
     ImGui::CreateContext();
@@ -47,10 +47,10 @@ void ImGuiComponentXR::initialize(ANativeWindow* pWindow) {
     io.IniFilename = nullptr;
 
     ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = gGraphicsContext_->mInstance_;
+    init_info.Instance = gGraphicsContext_->getInstance();
     init_info.PhysicalDevice = gGraphicsContext_->mPhysicalDevice_;
-    init_info.Device = gGraphicsContext_->mDevice_;
-    init_info.Queue = gGraphicsContext_->mQueue_;
+    init_info.Device = gGraphicsContext_->getDevice();
+    init_info.Queue = gGraphicsContext_->mGraphicsQueue_;
     init_info.DescriptorPool = gImguiDescriptorPool_;
     init_info.MinImageCount = 2;
     init_info.ImageCount = 2;

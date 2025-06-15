@@ -1,1 +1,0 @@
-#include "clay/graphics/common/IGraphicsContext.h"

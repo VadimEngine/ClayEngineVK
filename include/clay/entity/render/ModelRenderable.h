@@ -19,8 +19,11 @@ public:
 
     void setModel(Model* pModel);
 
+    void setColor(const glm::vec4 newColor);
+
 private:
     Model* mModel_;
+    glm::vec4 mColor_ = {1,1,1,1};
 };
 
 } // namespace clay

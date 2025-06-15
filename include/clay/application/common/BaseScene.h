@@ -9,13 +9,10 @@
 #include "clay/graphics/common/Model.h"
 #include "clay/graphics/common/Camera.h"
 #include "clay/entity/Entity.h"
-#include "clay/entity/render/ModelRenderable.h" // todo move this
-#include "clay/utils/xr/UtilsXR.h"
-
 
 namespace clay {
 
-class IApp;
+class BaseApp;
 
 class BaseScene {
 public:
@@ -24,7 +21,7 @@ public:
         glm::mat4 proj;
     };
 
-    BaseScene(IApp& app);
+    BaseScene(BaseApp& app);
 
     virtual ~BaseScene();
 
@@ -38,21 +35,14 @@ public:
 
     virtual void destroyResources() = 0;
 
+    BaseApp& getApp();
+
     Camera* getFocusCamera();
 
-//    virtual void update(float dt) = 0;
-
-    CameraConstant cameraConstants;
-
-    // temp for world locked
-    CameraConstant cameraConstants2;
-
-
-    Camera* mpFocusCamera_;
-
+protected:
+    BaseApp& mApp_;
     Camera mCamera_;
-
-    IApp& mApp_;
+    Camera* mpFocusCamera_;
 };
 
 } // namespace clay

@@ -7,7 +7,7 @@
 #include <unordered_map>
 // clay
 #include "clay/audio/Audio.h"
-#include "clay/graphics/common/IGraphicsContext.h"
+#include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/graphics/common/Mesh.h"
 #include "clay/graphics/common/Model.h"
 #include "clay/graphics/common/Material.h"
@@ -35,7 +35,7 @@ public:
 
     static const std::filesystem::path& getResourcePath(); 
 
-    Resources(IGraphicsContext& graphicsContext);
+    Resources(BaseGraphicsContext& graphicsContext);
 
     ~Resources();
 
@@ -55,11 +55,12 @@ public:
     void releaseAll();
 
 private:
+    // TODO maybe this can be class member. If for some reason resources are location specific
     static std::filesystem::path RESOURCE_PATH;
 
     static std::function<utils::FileData(const std::string&)> loadFileToMemory;
 
-    IGraphicsContext& mGraphicsContext_;
+    BaseGraphicsContext& mGraphicsContext_;
 
     // TODO shaders
     std::unordered_map<std::string, std::unique_ptr<Mesh>> mMeshes_;

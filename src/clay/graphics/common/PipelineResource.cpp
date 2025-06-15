@@ -15,43 +15,28 @@ PipelineResource::PipelineResource(const PipelineConfig& config)
 }
 
 PipelineResource::~PipelineResource() {
+    finalize();
+}
 
+const VkPipelineLayout& PipelineResource::getPipelineLayout() const {
+    return mPipelineLayout_;
+}
+
+const VkPipeline& PipelineResource::getPipeline() const {
+    return mPipeline_;
+}
+
+const VkDescriptorSetLayout& PipelineResource::getDescriptorSetLayout() const {
+    return mDescriptorSetLayout_;
 }
 
 void PipelineResource::createDescriptorSetLayout(const PipelineConfig& config) {
-    // create uniform buffers
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-
-    for (const auto& bufferCreateInfo : config.bufferCreateInfos) {
-        VkDescriptorSetLayoutBinding uboLayoutBinding{};
-        uboLayoutBinding.binding = bufferCreateInfo.binding;
-        uboLayoutBinding.descriptorCount = 1; // for arrays
-        uboLayoutBinding.descriptorType = bufferCreateInfo.descriptorType;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = bufferCreateInfo.stageFlags;
-
-        bindings.push_back(uboLayoutBinding);
-    }
-
-    for (const auto& imageCreateInfo : config.imageCreateInfos) {
-//        VkDescriptorSetLayoutBinding uboLayoutBinding{};
-//        uboLayoutBinding.binding = imageCreateInfo.binding;
-//        uboLayoutBinding.descriptorCount = 1; // for arrays
-//        uboLayoutBinding.descriptorType = imageCreateInfo.descriptorType;
-//        uboLayoutBinding.pImmutableSamplers = nullptr;
-//        uboLayoutBinding.stageFlags = imageCreateInfo.stageFlags;
-
-        bindings.push_back(imageCreateInfo);
-    }
-
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = bindings.size();
-    layoutInfo.pBindings = bindings.data();
+    layoutInfo.bindingCount = static_cast<uint32_t>(config.bindingLayoutInfo.bindings.size());
+    layoutInfo.pBindings = config.bindingLayoutInfo.bindings.data();
 
-    if (vkCreateDescriptorSetLayout(
-        mGraphicsContext_.mDevice_, &layoutInfo, nullptr, &mDescriptorSetLayout_
-    ) != VK_SUCCESS) {
+    if (vkCreateDescriptorSetLayout(mGraphicsContext_.getDevice(), &layoutInfo, nullptr, &mDescriptorSetLayout_) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
 }
@@ -60,9 +45,9 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(config.attributeDescriptions.size());
-    vertexInputInfo.pVertexAttributeDescriptions = config.attributeDescriptions.data();
-    vertexInputInfo.pVertexBindingDescriptions = &config.vertexInputBindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(config.pipelineLayoutInfo.attributeDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions = config.pipelineLayoutInfo.attributeDescriptions.data();
+    vertexInputInfo.pVertexBindingDescriptions = &config.pipelineLayoutInfo.vertexInputBindingDescription;
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -113,23 +98,23 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &mDescriptorSetLayout_;
-    pipelineLayoutInfo.pushConstantRangeCount = config.pushConstants.size();
-    pipelineLayoutInfo.pPushConstantRanges = config.pushConstants.data();
+    pipelineLayoutInfo.pushConstantRangeCount =  static_cast<uint32_t>(config.pipelineLayoutInfo.pushConstants.size());
+    pipelineLayoutInfo.pPushConstantRanges = config.pipelineLayoutInfo.pushConstants.data();
 
-    if (vkCreatePipelineLayout(mGraphicsContext_.mDevice_, &pipelineLayoutInfo, nullptr, &mPipelineLayout_) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(mGraphicsContext_.getDevice(), &pipelineLayoutInfo, nullptr, &mPipelineLayout_) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
     }
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = config.shaderStages.size();
-    pipelineInfo.pStages = config.shaderStages.data();
+    pipelineInfo.stageCount =  static_cast<uint32_t>(config.pipelineLayoutInfo.shaderStages.size());
+    pipelineInfo.pStages = config.pipelineLayoutInfo.shaderStages.data();
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
     pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &config.rasterizerState;
+    pipelineInfo.pRasterizationState = &config.pipelineLayoutInfo.rasterizerState;
     pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = &config.depthStencilState;
+    pipelineInfo.pDepthStencilState = &config.pipelineLayoutInfo.depthStencilState;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = mPipelineLayout_;
@@ -137,10 +122,22 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    VkResult result = vkCreateGraphicsPipelines(mGraphicsContext_.mDevice_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mPipeline_);
+    VkResult result = vkCreateGraphicsPipelines(mGraphicsContext_.getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mPipeline_);
 
     if (result != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics pipeline!");
+    }
+}
+
+void PipelineResource::finalize() {
+    if (mPipeline_ != VK_NULL_HANDLE) {
+        vkDestroyPipeline(mGraphicsContext_.getDevice(), mPipeline_, nullptr);
+    }
+    if (mPipelineLayout_ != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(mGraphicsContext_.getDevice(), mPipelineLayout_, nullptr);
+    }
+    if (mDescriptorSetLayout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(mGraphicsContext_.getDevice(), mDescriptorSetLayout_, nullptr);
     }
 }
 

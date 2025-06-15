@@ -9,7 +9,7 @@ namespace clay {
 
 void mouse_callback(GLFWwindow* window, double xPos, double yPos) {
    Window* windowWrapper = static_cast<Window*>(glfwGetWindowUserPointer(window));
-   InputHandlerDesktop& inputHandler = *(InputHandlerDesktop*)windowWrapper->getInputHandler();
+   InputHandlerDesktop& inputHandler = (InputHandlerDesktop&)windowWrapper->getInputHandler();
    inputHandler.onMouseMove(static_cast<int>(xPos), static_cast<int>(yPos));
    //get width and height
    int winHeight;
@@ -25,7 +25,7 @@ void mouse_callback(GLFWwindow* window, double xPos, double yPos) {
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
    Window* windowWrapper = static_cast<Window*>(glfwGetWindowUserPointer(window));
-   InputHandlerDesktop& inputHandler = *(InputHandlerDesktop*)windowWrapper->getInputHandler();
+   InputHandlerDesktop& inputHandler = (InputHandlerDesktop&)windowWrapper->getInputHandler();
 
    double xpos, ypos;
    glfwGetCursorPos(window, &xpos, &ypos);
@@ -64,14 +64,14 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 void mouseWheelCallback(GLFWwindow* window, double xOffset, double yOffset) {
    Window* windowWrapper = static_cast<Window*>(glfwGetWindowUserPointer(window));
-   InputHandlerDesktop& inputHandler = *(InputHandlerDesktop*)windowWrapper->getInputHandler();
+   InputHandlerDesktop& inputHandler = (InputHandlerDesktop&)windowWrapper->getInputHandler();
 
    inputHandler.onMouseWheel(yOffset);
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
    Window* windowWrapper = static_cast<Window*>(glfwGetWindowUserPointer(window));
-   InputHandlerDesktop& inputHandler = *(InputHandlerDesktop*)windowWrapper->getInputHandler();
+   InputHandlerDesktop& inputHandler = (InputHandlerDesktop&)windowWrapper->getInputHandler();
 
    if (action == GLFW_PRESS) {
        inputHandler.onKeyPressed(key);
@@ -81,16 +81,16 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
    // GLFW_REPEAT
 }
 
-void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-    //auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
-    //app->framebufferResized = true;
+void framebufferResizeCallback(GLFWwindow* glfwWindow, int width, int height) {
+    auto window = reinterpret_cast<Window*>(glfwGetWindowUserPointer(glfwWindow));
+    window->pushEvent(Window::WindowEvent::RESIZED);
 }   
 
-Window::Window() {
+Window::Window(int width, int height) {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    mpGLFWWindow_ = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Vulkan", nullptr, nullptr);
+    mpGLFWWindow_ = glfwCreateWindow(width, height, "Vulkan", nullptr, nullptr);
     glfwSetWindowUserPointer(mpGLFWWindow_, this);
 
     glfwSetFramebufferSizeCallback(mpGLFWWindow_, framebufferResizeCallback);
@@ -109,10 +109,6 @@ Window::~Window() {
 
 void Window::update(float dt) {
     glfwPollEvents();
-}
-
-void Window::render() {
-
 }
 
 std::pair<int, int> Window::getDimensions() const {
@@ -142,8 +138,22 @@ VkSurfaceKHR Window::createSurface(VkInstance& instance) {
     return surface;
 }
 
-InputHandlerDesktop* Window::getInputHandler() {
-    return &mInputHandler_;
+void Window::pushEvent(WindowEvent evt) {
+    mWindowEventQueue_.push(evt);
+}
+
+std::optional<Window::WindowEvent> Window::pollEvent() {
+    if (mWindowEventQueue_.empty()) {
+        return std::nullopt;
+    }
+
+    WindowEvent outEvent = mWindowEventQueue_.front();
+    mWindowEventQueue_.pop();
+    return outEvent;
+}
+
+InputHandlerDesktop& Window::getInputHandler() {
+    return mInputHandler_;
 }
 
 } // namespace clay

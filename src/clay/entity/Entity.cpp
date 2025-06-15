@@ -11,7 +11,12 @@ Entity::Entity(): mPosition_(0,0,0),
                   mOrientation_(1.0f, 0.0f, 0.0f, 0.0f),
                   mScale_(1,1,1) {}
 
-Entity::~Entity() {}
+Entity::~Entity() {
+    // todo switch to unique ptr
+    for (auto* eachRenderable : mRenderables_) {
+        delete eachRenderable;
+    }
+}
 
 void Entity::render(VkCommandBuffer cmdBuffer) const {
     // translation matrix for position

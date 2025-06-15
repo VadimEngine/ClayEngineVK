@@ -16,8 +16,15 @@ void ModelRenderable::render(VkCommandBuffer cmdBuffer, const glm::mat4& parentM
 
     glm::mat4 localModelMat = translationMat * rotationMatrix * scaleMat;
 
-    // TODO set/pass color and other uniforms here instead of in the model
-    mModel_->render(cmdBuffer, parentModelMat * localModelMat);
+    struct PushConstants {
+        glm::mat4 model;
+        glm::vec4 color; // optional depending on material
+    } push;
+
+    push.model = parentModelMat * localModelMat;
+    push.color = mColor_;
+
+    mModel_->render(cmdBuffer, &push, sizeof(push));
 }
 
 const Model* ModelRenderable::getModel() const {
@@ -26,6 +33,10 @@ const Model* ModelRenderable::getModel() const {
 
 void ModelRenderable::setModel(Model* pModel) {
     mModel_ = pModel;
+}
+
+void ModelRenderable::setColor(const glm::vec4 newColor) {
+    mColor_ = newColor;
 }
 
 } // namespace clay

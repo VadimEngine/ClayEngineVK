@@ -86,7 +86,6 @@ public:
 
     glm::quat& getOrientation();
 
-
     /** Get camera position */
     glm::vec3 getPosition() const;
 

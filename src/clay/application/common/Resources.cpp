@@ -19,10 +19,12 @@ std::filesystem::path Resources::RESOURCE_PATH = "";
 
 std::function<utils::FileData(const std::string&)> Resources::loadFileToMemory;
 
-Resources::Resources(IGraphicsContext& graphicsContext) :
+Resources::Resources(BaseGraphicsContext& graphicsContext) :
     mGraphicsContext_(graphicsContext) {};
 
-Resources::~Resources() = default;
+Resources::~Resources() {
+    releaseAll();
+}
 
 // TODO need logic for parsing meshes and materials
 template<typename T>
@@ -33,7 +35,7 @@ void Resources::loadResource(const std::vector<std::string>& resourcePath, const
         std::vector<clay::Mesh> loadedMeshes;
         Mesh::parseObjFile(mGraphicsContext_, loadedFile, loadedMeshes);
 
-        // TODO confirm there is only 1 mesh here
+        // TODO confirm there is only 1 mesh here // TODO mesh clean up seems wrong. There is delete happening due to the std::vector<clay::Mesh> being passed?
         std::unique_ptr<Mesh> meshPtr = std::make_unique<Mesh>(std::move(loadedMeshes[0]));
         mMeshes_[resourceName] = std::move(meshPtr);
 
@@ -169,7 +171,10 @@ void Resources::release(const std::string& resourceName) {
 void Resources::releaseAll() {
     mMeshes_.clear();
     mModels_.clear();
-    mSamplers_.clear();
+    for (auto& [_, eachSampler]: mSamplers_) {
+        vkDestroySampler(mGraphicsContext_.getDevice(), *eachSampler, nullptr);
+    }
+    mSamplers_.clear(); // free all
     mTextures_.clear();
     mPipelineResources_.clear();
     mMaterials_.clear();
