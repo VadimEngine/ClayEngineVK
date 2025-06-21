@@ -90,7 +90,8 @@ Window::Window(int width, int height) {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    mpGLFWWindow_ = glfwCreateWindow(width, height, "Vulkan", nullptr, nullptr);
+    // TODO pass in window name
+    mpGLFWWindow_ = glfwCreateWindow(width, height, "Clay Engine VK", nullptr, nullptr);
     glfwSetWindowUserPointer(mpGLFWWindow_, this);
 
     glfwSetFramebufferSizeCallback(mpGLFWWindow_, framebufferResizeCallback);

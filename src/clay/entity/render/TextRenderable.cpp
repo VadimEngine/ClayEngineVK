@@ -1,3 +1,5 @@
+#include <cstring> // memcpy
+// class
 #include "clay/entity/render/TextRenderable.h"
 
 namespace clay {

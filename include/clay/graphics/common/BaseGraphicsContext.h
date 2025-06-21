@@ -1,4 +1,6 @@
 #pragma once
+// standard lib
+#include <cstring> // memcpy
 // third party
 #include <vulkan/vulkan.h>
 #include "clay/utils/common/Utils.h"
