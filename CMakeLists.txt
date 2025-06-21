@@ -66,20 +66,20 @@ list(APPEND SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/imgui_tables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/imgui_widgets.cpp
 )
-if(CLAY_PLATFORM_XR)
+if(CLAY_PLATFORM_XR OR CLAY_PLATFORM_ANDROID)
     list(APPEND SRC_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/backends/imgui_impl_android.cpp
     )
 endif()
 if(CLAY_PLATFORM_DESKTOP)
     list(APPEND SRC_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/backends/imgui_impl_glfw.cpp
-)
+        ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/backends/imgui_impl_glfw.cpp
+    )
 endif()
 
 # Define the library target
 add_library(${PROJECT_NAME} STATIC ${SRC_FILES})
-if(CLAY_PLATFORM_XR)
+if(CLAY_PLATFORM_XR OR CLAY_PLATFORM_ANDROID)
     # Android-specific imports
     include(AndroidNdkModules)
     android_ndk_import_module_native_app_glue()
@@ -93,7 +93,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/backends
 )
 
-if(CLAY_PLATFORM_XR)
+if(CLAY_PLATFORM_XR OR CLAY_PLATFORM_ANDROID)
     target_include_directories(${PROJECT_NAME} PUBLIC
         ${ANDROID_NDK}/sources/android/native_app_glue
     )
@@ -120,6 +120,15 @@ if(CLAY_PLATFORM_XR)
         native_app_glue
         jnigraphics
         openxr_loader
+    )
+endif()
+if(CLAY_PLATFORM_ANDROID)
+    set(CLAY_PLATFORM_LIBS
+        android
+        vulkan
+        log
+        native_app_glue
+        jnigraphics
     )
 endif()
 if (CLAY_PLATFORM_DESKTOP) # todo elseif?
@@ -151,6 +160,9 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${CLAY_COMMON_LIBS} ${CLAY_PLATFORM
 
 if(CLAY_PLATFORM_XR)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_XR)
+endif()
+if(CLAY_PLATFORM_ANDROID)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_ANDROID)
 endif()
 if(CLAY_PLATFORM_DESKTOP)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_DESKTOP)
