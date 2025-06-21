@@ -11,7 +11,6 @@ struct FileData {
 };
 
 struct ImageData {
-    // should this also be a unique ptr?
     std::unique_ptr<uint8_t[]> pixels;
     int width;
     int height;

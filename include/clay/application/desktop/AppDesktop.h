@@ -1,7 +1,6 @@
 #pragma once
 
 #ifdef CLAY_PLATFORM_DESKTOP
-
 // standard lib
 #include <stdexcept>
 #include <cstdlib>
@@ -49,8 +48,6 @@ protected:
     bool mFramebufferResized_ = false;
 
     std::chrono::steady_clock::time_point mLastTime_;
-
-    AudioManager mAudioManger_;
 };
 
 } // namespace clay

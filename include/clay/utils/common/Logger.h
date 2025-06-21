@@ -7,7 +7,7 @@
 // Define the global flag for enabling/disabling logs
 #define PRINT_GLOBAL
 
-#ifdef CLAY_PLATFORM_XR
+#if defined(CLAY_PLATFORM_XR) || defined(CLAY_PLATFORM_ANDROID)
 // Android platform logging
 #include <android/log.h>
 
