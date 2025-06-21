@@ -1,6 +1,6 @@
 # Clay Engine with Vulkan
 
-Static C++/Vulkan cross-platform game engine library with support for Desktop and Oculus XR applications. 
+ClayEngineVK is a static C++ game engine library built on Vulkan, designed for cross-platform development with support for Windows, Linux, Android, and Oculus Quest XR.
 
 ### Third Party Libraries
 All the libraries submodules are included in `./thirdparty`:
@@ -13,6 +13,8 @@ All the libraries submodules are included in `./thirdparty`:
     - Creating windows for desktop and receiving input, 
 - GLM
     - Vector/matrix/quaternion and other graphics related math
+- googletest
+    - Unit testing
 - imgui
     - Prototype GUI
 - OpenAL
@@ -38,9 +40,12 @@ All the libraries submodules are included in `./thirdparty`:
 This library can be added to a cmake as a subdirectory:
 
 ```cmake
-set(CLAY_PLATFORM_XR ON CACHE BOOL "Set Platform to VR" FORCE) # If Building for XR
-
-set(CLAY_PLATFORM_DESKTOP ON CACHE BOOL "Set Platform to Desktop" FORCE) # If Building for Desktop (Windows or linux)
+# If Building for XR
+set(CLAY_PLATFORM_XR ON CACHE BOOL "Set Platform to VR" FORCE) 
+# If Building for Desktop (Windows or linux)
+set(CLAY_PLATFORM_DESKTOP ON CACHE BOOL "Set Platform to Desktop" FORCE) 
+ # If Building for Android Mobile
+set(CLAY_PLATFORM_ANDROID ON CACHE BOOL "Set Platform to Android" FORCE)
 
 # Add ClayEngine
 add_subdirectory(
@@ -51,6 +56,8 @@ add_subdirectory(
 
 ### Demos
 
-- [ Desktop Demo:](https://github.com/VadimEngine/ClayEngineVKDemo)
+- [Window/Linux Desktop Demo](https://github.com/VadimEngine/ClayEngineVKDemo)
 
-- [XR Meta Quest Demo](https://github.com/VadimEngine/ClayEngineVKDemoXR)
+- [Meta Quest XR Demo](https://github.com/VadimEngine/ClayEngineVKDemoXR)
+
+- [Android Mobile Demo](https://github.com/VadimEngine/ClayEngineVKMobile)
