@@ -73,4 +73,9 @@ void Entity::setScale(const glm::vec3& newScale) {
     mScale_ = newScale;
 }
 
+std::vector<BaseRenderable*>& Entity::getRenderables() {
+    return mRenderables_;
+}
+
+
 } // namespace clay

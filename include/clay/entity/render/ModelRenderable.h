@@ -5,7 +5,6 @@
 
 namespace clay {
 
-
 class ModelRenderable : public BaseRenderable {
 public:
 
@@ -20,6 +19,8 @@ public:
     void setModel(Model* pModel);
 
     void setColor(const glm::vec4 newColor);
+
+    glm::vec4 getColor() const;
 
 private:
     Model* mModel_;

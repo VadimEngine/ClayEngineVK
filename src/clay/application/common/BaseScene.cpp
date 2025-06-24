@@ -5,12 +5,19 @@
 
 namespace clay {
 
-BaseScene::BaseScene(BaseApp& app) : mApp_(app), mpFocusCamera_(&mCamera_) {}
+BaseScene::BaseScene(BaseApp& app) 
+    : mApp_(app),
+      mResources_(app.getGraphicsContext()),
+      mpFocusCamera_(&mCamera_) {}
 
 BaseScene::~BaseScene() {}
 
 BaseApp& BaseScene::getApp() {
     return mApp_;
+}
+
+Resources& BaseScene::getResources() {
+    return mResources_;
 }
 
 Camera* BaseScene::getFocusCamera() {

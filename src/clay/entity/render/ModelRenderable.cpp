@@ -39,4 +39,8 @@ void ModelRenderable::setColor(const glm::vec4 newColor) {
     mColor_ = newColor;
 }
 
+glm::vec4 ModelRenderable::getColor() const {
+    return mColor_;
+}
+
 } // namespace clay

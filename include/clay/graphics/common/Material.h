@@ -48,6 +48,7 @@ public:
 
     ~Material();
 
+    // TODO rename to bind (same for mesh)
     void bindMaterial(VkCommandBuffer cmdBuffer) const;
 
     void pushConstants(VkCommandBuffer cmdBuffer, const void* data, uint32_t size, VkShaderStageFlags stageFlags) const;

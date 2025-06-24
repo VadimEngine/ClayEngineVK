@@ -22,6 +22,10 @@ glm::quat BaseRenderable::getOrientation() const {
     return mOrientation_;
 }
 
+glm::quat& BaseRenderable::getOrientation() {
+    return mOrientation_;
+}
+
 glm::vec3 BaseRenderable::getScale() const {
     return mScale_;
 }
@@ -30,7 +34,7 @@ void BaseRenderable::setPosition(const glm::vec3& newPosition) {
     mPosition_ = newPosition;
 }
 
-void BaseRenderable::setOrientation(const glm::vec3& newOrientation) {
+void BaseRenderable::setOrientation(const glm::quat& newOrientation) {
     mOrientation_ = newOrientation;
 }
 

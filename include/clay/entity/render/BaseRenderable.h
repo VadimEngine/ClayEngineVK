@@ -1,5 +1,6 @@
 #pragma once
 // third party
+// glm
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
 // vulkan
@@ -26,6 +27,8 @@ public:
     /** Get this Renderable's orientation */
     glm::quat getOrientation() const;
 
+    glm::quat& getOrientation();
+
     /** Get this Renderable's scale */
     glm::vec3 getScale() const;
 
@@ -39,7 +42,7 @@ public:
      * Set this Renderable's orientation (In degrees)
      * @param newOrientation New Orientation quaternion
      */
-    void setOrientation(const glm::vec3& newOrientation);
+    void setOrientation(const glm::quat& newOrientation);
 
     /**
      * Set this Renderable's scale

@@ -226,15 +226,15 @@ uint32_t BaseGraphicsContext::findMemoryType(uint32_t typeFilter, VkMemoryProper
 }
 
 void BaseGraphicsContext::createImage(uint32_t width,
-                                     uint32_t height,
-                                     uint32_t mipLevels, 
-                                     VkSampleCountFlagBits numSamples, 
-                                     VkFormat format, 
-                                     VkImageTiling tiling, 
-                                     VkImageUsageFlags usage, 
-                                     VkMemoryPropertyFlags properties, 
-                                     VkImage& image, 
-                                     VkDeviceMemory& imageMemory) {
+                                      uint32_t height,
+                                      uint32_t mipLevels, 
+                                      VkSampleCountFlagBits numSamples, 
+                                      VkFormat format, 
+                                      VkImageTiling tiling, 
+                                      VkImageUsageFlags usage, 
+                                      VkMemoryPropertyFlags properties, 
+                                      VkImage& image, 
+                                      VkDeviceMemory& imageMemory) {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -261,7 +261,7 @@ void BaseGraphicsContext::createImage(uint32_t width,
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-    // error here from createColorResources
+
     if (vkAllocateMemory(mDevice_, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate image memory!");
     }

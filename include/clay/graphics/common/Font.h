@@ -34,7 +34,7 @@ public:
         static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
     };
 
-    Font(BaseGraphicsContext& graphicsAPI, utils::FileData& fontFileData, utils::FileData& vertexFileData, utils::FileData& fragmentFileData, UniformBuffer& uniformBuffer);
+    Font(BaseGraphicsContext& graphicsAPI, utils::FileData& fontFileData, ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer);
 
     const PipelineResource& getPipeline() const;
 
@@ -45,7 +45,7 @@ public:
     const CharacterInfo& getCharacterInfo(char c) const;
 
 private:
-    void createPipeline(utils::FileData& vertexFileData, utils::FileData& fragmentFileData, UniformBuffer& uniformBuffer);
+    void createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer);
 
     BaseGraphicsContext& mGContext_;
 

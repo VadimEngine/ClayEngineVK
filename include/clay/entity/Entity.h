@@ -42,7 +42,7 @@ public:
     void setPosition(const glm::vec3& newPosition);
 
     /**
-     * Set this Renderable's orientation (In degrees)
+     * Set this Renderable's orientation
      * @param newOrientation New Orientation quaternion
      */
     void setOrientation(const glm::quat& newOrientation);
@@ -52,6 +52,8 @@ public:
      * @param newScale New scale vector
      */
     void setScale(const glm::vec3& newScale);
+
+    std::vector<BaseRenderable*>& getRenderables();
 
 protected:
     glm::vec3 mPosition_;

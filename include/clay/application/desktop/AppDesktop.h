@@ -36,6 +36,10 @@ public:
 
     GraphicsContextDesktop& getGraphicsContextDesktop();
 
+    bool tempVSyncFlag = false;
+    bool tempVSyncValue = false;
+
+
 protected:
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     
