@@ -10,10 +10,6 @@
 
 namespace clay {
 
-
-
-
-
 Mesh processMesh(BaseGraphicsContext& gContext, aiMesh* mesh, const aiScene* scene) {
     std::vector<Mesh::Vertex> vertices;
     std::vector<unsigned int> indices;

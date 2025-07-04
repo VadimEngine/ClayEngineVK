@@ -137,6 +137,8 @@ public:
     std::vector<VkSemaphore> mRenderFinishedSemaphores_;
     std::vector<VkFence> mInFlightFences_;
     std::unique_ptr<UniformBuffer> mCameraUniform_;
+    std::unique_ptr<UniformBuffer> mCameraUniformHeadLocked_;
+
     Window& mWindow_; // todo remove this
     bool mVSyncEnabled_;
 };

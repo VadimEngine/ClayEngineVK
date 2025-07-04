@@ -91,6 +91,12 @@ void GraphicsContextDesktop::initialize(Window& window) {
         sizeof(clay::BaseScene::CameraConstant),
         nullptr
     );
+
+    mCameraUniformHeadLocked_ = std::make_unique<UniformBuffer>(
+        *this,
+        sizeof(clay::BaseScene::CameraConstant),
+        nullptr
+    );
 }
 
 bool GraphicsContextDesktop::checkValidationLayerSupport() {
@@ -647,7 +653,8 @@ void GraphicsContextDesktop::createSwapChain(Window& mWindow) {
 
 VkSurfaceFormatKHR GraphicsContextDesktop::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     for (const auto& availableFormat : availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        // VK_FORMAT_B8G8R8A8_UNORM 
+        if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
         }
     }
@@ -823,6 +830,8 @@ void GraphicsContextDesktop::createSyncObjects() {
 void GraphicsContextDesktop::cleanUp() {
     cleanupSwapChain();
     mCameraUniform_.reset();
+    mCameraUniformHeadLocked_.reset();
+
     vkDestroyRenderPass(mDevice_, mRenderPass_, nullptr);
 
     vkDestroyDescriptorPool(mDevice_, mDescriptorPool_, nullptr);

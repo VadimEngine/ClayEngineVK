@@ -8,7 +8,6 @@
 #include "clay/utils/common/Utils.h"
 #include "clay/graphics/common/Model.h"
 #include "clay/graphics/common/Camera.h"
-#include "clay/entity/Entity.h"
 #include "clay/application/common/Resources.h"
 
 namespace clay {

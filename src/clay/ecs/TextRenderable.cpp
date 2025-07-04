@@ -1,11 +1,10 @@
-#include <cstring> // memcpy
-// class
-#include "clay/entity/render/TextRenderable.h"
+#include "clay/ecs/TextRenderable.h"
 
-namespace clay {
+namespace clay::ecs {
 
-TextRenderable::TextRenderable(BaseGraphicsContext& gContext, const std::string& text, Font* font)
-    : BaseRenderable(), mGraphicsContext_(gContext) {
+TextRenderable::TextRenderable() {}
+
+void TextRenderable::initialize(BaseGraphicsContext& gContext, const std::string& text, Font* font) {
     mText_ = text;
     mpFont_ = font;
     float totalWidth = 0.0f;
@@ -49,20 +48,15 @@ TextRenderable::TextRenderable(BaseGraphicsContext& gContext, const std::string&
         x += glyph.advance / 64.0f; // advance in pixels
     }
 
-    createVertexBuffer();
+    createVertexBuffer(gContext);
 }
 
-TextRenderable::~TextRenderable() {
-    vkDestroyBuffer(mGraphicsContext_.getDevice(), mVertexBuffer_, nullptr);
-    vkFreeMemory(mGraphicsContext_.getDevice(), mVertexBufferMemory_, nullptr);
-}
-
-void TextRenderable::createVertexBuffer() {
+void TextRenderable::createVertexBuffer(BaseGraphicsContext& gContext) {
     VkDeviceSize bufferSize = sizeof(mVertices_[0]) * mVertices_.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
-    mGraphicsContext_.createBuffer(
+    gContext.createBuffer(
         bufferSize,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -71,11 +65,11 @@ void TextRenderable::createVertexBuffer() {
     );
 
     void* data;
-    vkMapMemory(mGraphicsContext_.getDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    vkMapMemory(gContext.getDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
     memcpy(data, mVertices_.data(), (size_t)bufferSize);
-    vkUnmapMemory(mGraphicsContext_.getDevice(), stagingBufferMemory);
+    vkUnmapMemory(gContext.getDevice(), stagingBufferMemory);
 
-    mGraphicsContext_.createBuffer(
+    gContext.createBuffer(
         bufferSize,
         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -83,10 +77,15 @@ void TextRenderable::createVertexBuffer() {
         mVertexBufferMemory_
     );
 
-    mGraphicsContext_.copyBuffer(stagingBuffer, mVertexBuffer_, bufferSize);
+    gContext.copyBuffer(stagingBuffer, mVertexBuffer_, bufferSize);
 
-    vkDestroyBuffer(mGraphicsContext_.getDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(mGraphicsContext_.getDevice(), stagingBufferMemory, nullptr);
+    vkDestroyBuffer(gContext.getDevice(), stagingBuffer, nullptr);
+    vkFreeMemory(gContext.getDevice(), stagingBufferMemory, nullptr);
+}
+
+void TextRenderable::finalize(BaseGraphicsContext& gContext) {
+    vkDestroyBuffer(gContext.getDevice(), mVertexBuffer_, nullptr);
+    vkFreeMemory(gContext.getDevice(), mVertexBufferMemory_, nullptr);
 }
 
 void TextRenderable::render(VkCommandBuffer cmdBuffer, const glm::mat4& parentModelMat) {
@@ -118,8 +117,5 @@ glm::mat4 TextRenderable::getModelMatrix() {
     return translationMat * rotationMat * scaleMat;
 }
 
-void TextRenderable::setColor(const glm::vec4 newColor) {
-    mColor_ = newColor;
-}
 
-} // namespace clay
+} // namespace clay::ecs

@@ -21,6 +21,12 @@ public:
 
     Model(BaseGraphicsContext& gContext);
 
+    // move constructor
+    Model(Model&& other) noexcept;
+
+    // move assignment
+    Model& operator=(Model&& other) noexcept;
+
     ~Model();
 
     void addElement(const ModelElement& element);

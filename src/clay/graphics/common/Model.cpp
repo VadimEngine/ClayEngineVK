@@ -8,6 +8,18 @@ namespace clay {
 Model::Model(BaseGraphicsContext& gContext)
     :mGraphicsContext_(gContext) {}
 
+    // move constructor
+Model::Model(Model&& other) noexcept
+    : mGraphicsContext_(other.mGraphicsContext_) {
+        mModelGroups_ = other.mModelGroups_;
+    }
+
+    // move assignment
+Model& Model::operator=(Model&& other) noexcept {
+    mModelGroups_ = other.mModelGroups_;
+    return *this;
+}
+
 Model::~Model() {}
 
 void Model::addElement(const ModelElement& element) {

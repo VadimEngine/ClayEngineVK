@@ -17,12 +17,11 @@
 #include "clay/utils/common/Utils.h"
 
 /*
- TODO maybe do a data oriented design where containers are std::vector<T> rather map<T*>
+ TODO maybe do a data oriented design where containers are std::vector<T> rather than map<T*>
  - getResources will return a reference accessed by index. Need to add a namedToIndex()
  - when releasing resources, keep track of available slots to use when adding a new resource
  - maybe have external and internal id where external is what outside classes use while internal is the index
    in the container (which updates when data is moved around) name->internalId->externalId
-
  */
 
 namespace clay {
@@ -54,6 +53,51 @@ public:
 
     void releaseAll();
 
+    ////////////
+    // TODO use a ResourcePool Struct instead
+    template<typename T>
+    struct Handle {
+        uint32_t index   = 0;
+        uint32_t gen     = 0;
+    };
+
+    template<typename T>
+    struct ResourcePool {
+
+        std::vector<T> resources;
+        std::vector<uint32_t> generations; // track when a resource slot is resused, if a older generation is used, then throw error
+        std::vector<uint32_t> freeList;      // stack of vacant indices
+        std::unordered_map<std::string, Handle<T>> name2Handle;
+
+        Handle<T> loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName);
+        Handle<T> add(const std::string& name, T&& obj);
+        void remove(Handle<T> handle);
+        T& operator[](Handle<T> handle);
+        Handle<T> getHandle(const std::string& name) const;
+    };
+
+    ResourcePool<Mesh> mMeshesPool_;
+    ResourcePool<Model> mModelsPool_;
+    ResourcePool<VkSampler> mSamplersPool_;
+    ResourcePool<Texture> mTexturesPool_;
+    ResourcePool<PipelineResource> mPipePool_;
+    ResourcePool<Material> mMaterialsPool_;
+    ResourcePool<Audio> mAudiosPool_;
+    ResourcePool<Font> mFontsPool_;
+
+    //template<typename T>
+    //uint32_t addResource2(const std::string& name, T&& resource);
+
+    //template<typename T>
+    //T& getResource2(uint32_t handle);
+
+    //template<typename T>
+    //T& getResource2(const std::string& resourceName);
+
+    //std::unordered_map<std::string, uint32_t> 
+    //std::vector<Model> mModels2_;
+////////////////////
+
 private:
     // TODO maybe this can be class member. If for some reason resources are location specific
     static std::filesystem::path RESOURCE_PATH;
@@ -71,6 +115,9 @@ private:
     std::unordered_map<std::string, std::unique_ptr<Material>> mMaterials_;
     std::unordered_map<std::string, std::unique_ptr<Audio>> mAudios_;
     std::unordered_map<std::string, std::unique_ptr<Font>> mFonts_;
+
+
+
 };
 
 } // namespace clay
