@@ -114,7 +114,6 @@ Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, ShaderM
 
     FT_Set_Pixel_Sizes(face, 0, 48);
 
-
     for (unsigned char c = 0; c < 128; ++c) {
         if (FT_Load_Char(face, c, FT_LOAD_RENDER)) {
             LOG_E("ERROR::FREETYTPE: Failed to load Glyph");
@@ -196,6 +195,49 @@ Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, ShaderM
     }
 
     createPipeline(vertShader, fragShader, uniformBuffer);
+}
+
+// move constructor
+Font::Font(Font&& other)
+    : mGContext_(other.mGContext_) {
+
+    mSampler_ = other.mSampler_;
+    mCharacterFrontInfo_ = other.mCharacterFrontInfo_;
+    mCharacterImage_ = other.mCharacterImage_;
+    mCharacterMemory_ = other.mCharacterMemory_;
+    mCharacterImageView_ = other.mCharacterImageView_;
+
+    mPipeline_ = std::move(other.mPipeline_);
+    mMaterial_ = std::move(other.mMaterial_);
+
+    other.mSampler_ = VK_NULL_HANDLE;
+    for (size_t i = 0; i < 128; ++i) {
+        other.mCharacterImageView_[i] = VK_NULL_HANDLE;
+        other.mCharacterImage_[i] = VK_NULL_HANDLE;
+        other.mCharacterMemory_[i] = VK_NULL_HANDLE;
+    }
+}
+
+// move assignment
+Font& Font::operator=(Font&& other) noexcept {
+    if (this != &other) {
+        mSampler_ = other.mSampler_;
+        mCharacterFrontInfo_ = other.mCharacterFrontInfo_;
+        mCharacterImage_ = other.mCharacterImage_;
+        mCharacterMemory_ = other.mCharacterMemory_;
+        mCharacterImageView_ = other.mCharacterImageView_;
+
+        mPipeline_ = std::move(other.mPipeline_);
+        mMaterial_ = std::move(other.mMaterial_);
+
+        other.mSampler_ = VK_NULL_HANDLE;
+        for (size_t i = 0; i < 128; ++i) {
+            other.mCharacterImageView_[i] = VK_NULL_HANDLE;
+            other.mCharacterImage_[i] = VK_NULL_HANDLE;
+            other.mCharacterMemory_[i] = VK_NULL_HANDLE;
+        }
+    }
+    return *this;
 }
 
 Font::~Font() {

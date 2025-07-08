@@ -31,7 +31,23 @@ void Material::pushConstants(VkCommandBuffer cmdBuffer, const void* data, uint32
     vkCmdPushConstants(cmdBuffer, mPipelineResource_.getPipelineLayout(), stageFlags, 0, size, data);
 }
 
-Material::~Material() {}
+// move constructor
+Material::Material(Material&& other) 
+    : mGraphicsContext_(other.mGraphicsContext_),
+      mPipelineResource_(other.mPipelineResource_),
+      mDescriptorSet_(other.mDescriptorSet_) {}
+
+// move assignment
+Material& Material::operator=(Material&& other) noexcept {
+    if (this != &other) {
+        mDescriptorSet_ = other.mDescriptorSet_;
+    }
+    return *this;
+}
+
+Material::~Material() {
+    // VkDescriptorSet does not need to be finalized manually. It is freed when the VkDescriptorPool is finalized
+}
 
 void Material::createDescriptorSet(const MaterialConfig& config) {
     // Allocate descriptor set

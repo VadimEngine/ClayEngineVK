@@ -6,17 +6,19 @@ namespace clay {
 // TODO load from file logic
 
 Model::Model(BaseGraphicsContext& gContext)
-    :mGraphicsContext_(gContext) {}
+    : mGraphicsContext_(gContext) {}
 
-    // move constructor
+// move constructor
 Model::Model(Model&& other) noexcept
     : mGraphicsContext_(other.mGraphicsContext_) {
+    mModelGroups_ = other.mModelGroups_;
+}
+
+// move assignment
+Model& Model::operator=(Model&& other) noexcept {
+    if (this != &other) {
         mModelGroups_ = other.mModelGroups_;
     }
-
-    // move assignment
-Model& Model::operator=(Model&& other) noexcept {
-    mModelGroups_ = other.mModelGroups_;
     return *this;
 }
 

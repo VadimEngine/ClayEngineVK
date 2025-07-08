@@ -37,7 +37,7 @@ public:
 
     struct MaterialConfig {
         BaseGraphicsContext& graphicsContext;
-        PipelineResource& pipelineResource;
+        PipelineResource& pipelineResource; // TODO i think this should be a resource handle?
 
         std::vector<BufferBindingInfo> bufferBindings;
         std::vector<ImageBindingInfo> imageBindings;
@@ -45,6 +45,12 @@ public:
     };
 
     Material(const MaterialConfig& config);
+
+    // move constructor
+    Material(Material&& other);
+
+    // move assignment
+    Material& operator=(Material&& other) noexcept;
 
     ~Material();
 
@@ -65,7 +71,7 @@ private:
     void createDescriptorSet(const MaterialConfig& config);
 
     BaseGraphicsContext& mGraphicsContext_;
-    PipelineResource& mPipelineResource_;
+    PipelineResource& mPipelineResource_; // TODO i think this should be a handle?
     VkDescriptorSet mDescriptorSet_;
 
     std::vector<UniformBuffer> mUniformBuffers_;

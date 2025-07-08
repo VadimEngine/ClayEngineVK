@@ -9,6 +9,12 @@ class Texture {
 public:
     Texture(BaseGraphicsContext& gContext);
 
+    // move constructor
+    Texture(Texture&& other) noexcept;
+
+    // move assignment
+    Texture& operator=(Texture&& other) noexcept;
+
     ~Texture();
 
     void initialize(utils::ImageData& imageData);

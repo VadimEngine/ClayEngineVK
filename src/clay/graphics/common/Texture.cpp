@@ -6,6 +6,34 @@ namespace clay {
 Texture::Texture(BaseGraphicsContext& gContext)
     : mGraphicsContext_(gContext) {}
 
+Texture::Texture(Texture&& other) noexcept
+    : mGraphicsContext_(other.mGraphicsContext_) {
+    mImage_ = other.mImage_;
+    mImageMemory_ = other.mImageMemory_;
+    mImageView_ = other.mImageView_;
+    mSampler_ = other.mSampler_;
+
+    other.mImage_ = VK_NULL_HANDLE;
+    other.mImageMemory_ = VK_NULL_HANDLE;
+    other.mImageView_ = VK_NULL_HANDLE;
+    other.mSampler_ = VK_NULL_HANDLE;
+}
+
+Texture& Texture::operator=(Texture&& other) noexcept {
+    if (this != &other) {
+        mImage_ = other.mImage_;
+        mImageMemory_ = other.mImageMemory_;
+        mImageView_ = other.mImageView_;
+        mSampler_ = other.mSampler_;
+
+        other.mImage_ = VK_NULL_HANDLE;
+        other.mImageMemory_ = VK_NULL_HANDLE;
+        other.mImageView_ = VK_NULL_HANDLE;
+        other.mSampler_ = VK_NULL_HANDLE;
+    }
+    return *this;
+}
+
 Texture::~Texture() {
     finalize();
 }

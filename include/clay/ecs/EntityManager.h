@@ -12,16 +12,16 @@
 #include "clay/application/common/Resources.h"
 #include "clay/ecs/Types.h"
 #include "clay/graphics/common/Model.h"
-#include "clay/ecs/TextRenderable.h"
-
-//  https://austinmorlan.com/posts/entity_component_system/#the-component
+#include "clay/ecs/components/TextRenderable.h"
+#include "clay/ecs/systems/RenderSystem.h"
 
 namespace clay::ecs {
 
 class EntityManager {
 public:
 
-    EntityManager(Resources& resources);
+    EntityManager(BaseGraphicsContext& gContext, Resources& resources);
+
     ~EntityManager();
 
     Entity createEntity();
@@ -47,19 +47,19 @@ public:
 
 //private:
     Resources& mResources_;
+    RenderSystem mRenderSystem_;
 
-	std::queue<Entity> mAvailableEntities{};
+    std::vector<Entity> mFreeEntities;
+    std::set<Entity> mCurrentEntities_;
+
 	std::array<Signature, MAX_ENTITIES> mSignatures{};
 
     std::array<Transform, MAX_ENTITIES> mTransforms;
     std::array<ModelRenderable, MAX_ENTITIES> mModelRenderable;
     std::array<TextRenderable, MAX_ENTITIES> mTextRenderables;
+    std::array<SpriteRenderable, MAX_ENTITIES> mSpriteRenderables; 
     std::array<Collider, MAX_ENTITIES> mColliders;
-    std::array<SpriteRenderable, MAX_ENTITIES> mSpriteRenderables;
-    
     std::array<RigidBody, MAX_ENTITIES> mRigidBodies;
-
-    std::set<Entity> mCurrentEntities_;
 };
 
 } // namespace clay::ecs

@@ -32,6 +32,12 @@ public:
 
     PipelineResource(const PipelineConfig& config);
 
+    // move constructor
+    PipelineResource(PipelineResource&& other);
+
+    // move assignment
+    PipelineResource& operator=(PipelineResource&& other) noexcept;
+
     ~PipelineResource();
 
     const VkPipelineLayout& getPipelineLayout() const;

@@ -14,6 +14,33 @@ PipelineResource::PipelineResource(const PipelineConfig& config)
     createPipeline(config);
 }
 
+// move constructor
+PipelineResource::PipelineResource(PipelineResource&& other)
+    : mGraphicsContext_(other.mGraphicsContext_){
+    mPipelineLayout_ = other.mPipelineLayout_;
+    mPipeline_ = other.mPipeline_;
+    mDescriptorSetLayout_ = other.mDescriptorSetLayout_;
+
+    other.mPipelineLayout_ = VK_NULL_HANDLE;
+    other.mPipeline_ = VK_NULL_HANDLE;
+    other.mDescriptorSetLayout_ = VK_NULL_HANDLE;
+}
+
+// move assignment
+PipelineResource& PipelineResource::operator=(PipelineResource&& other) noexcept {
+    if (this != &other) {
+        finalize();
+        mPipelineLayout_ = other.mPipelineLayout_;
+        mPipeline_ = other.mPipeline_;
+        mDescriptorSetLayout_ = other.mDescriptorSetLayout_;
+
+        other.mPipelineLayout_ = VK_NULL_HANDLE;
+        other.mPipeline_ = VK_NULL_HANDLE;
+        other.mDescriptorSetLayout_ = VK_NULL_HANDLE;
+    }
+    return *this;
+}
+
 PipelineResource::~PipelineResource() {
     finalize();
 }

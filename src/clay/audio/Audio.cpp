@@ -58,7 +58,7 @@ sf_count_t vio_write(const void* ptr, sf_count_t count, void* user_data) {
     return 0;
 }
 
-Audio::Audio(utils::FileData& fileData) {
+Audio::Audio(const utils::FileData& fileData) {
     ALenum err, format;
     ALuint buffer;
     SNDFILE* sndfile;
@@ -68,11 +68,11 @@ Audio::Audio(utils::FileData& fileData) {
     ALsizei num_bytes;
     // Open the audio file and check that it's usable.
     SF_VIRTUAL_IO vio = {
-            vio_get_filelen, // Function to get the length of the file
-            vio_seek,        // Function to seek within the file
-            vio_read,        // Function to read from the file
-            vio_write,       // Function to write to the file (unused in this case)
-            vio_tell         // Function to get the current position in the file
+        vio_get_filelen, // Function to get the length of the file
+        vio_seek,        // Function to seek within the file
+        vio_read,        // Function to read from the file
+        vio_write,       // Function to write to the file (unused in this case)
+        vio_tell         // Function to get the current position in the file
     };
     VirtualFile vf = { fileData.data.get(), static_cast<sf_count_t>(fileData.size), 0 };
 
@@ -140,6 +140,23 @@ Audio::Audio(utils::FileData& fileData) {
     mId_ = buffer;
 }
 
+// move constructor
+Audio::Audio(Audio&& other) {
+    mId_ = other.mId_;
+    // todo confirm this does not conflict with alDeleteBuffers
+    other.mId_ = 0;
+}
+
+// move assignment
+Audio& Audio::operator=(Audio&& other) noexcept {
+    if (this != &other) {
+        mId_ = other.mId_;
+
+        // todo confirm this does not conflict with alDeleteBuffers
+        other.mId_ = 0;
+    }
+    return *this;
+}
 
 Audio::~Audio() {
     alDeleteBuffers(1, &mId_);

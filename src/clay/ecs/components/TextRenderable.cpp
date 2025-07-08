@@ -1,4 +1,4 @@
-#include "clay/ecs/TextRenderable.h"
+#include "clay/ecs/components/TextRenderable.h"
 
 namespace clay::ecs {
 
