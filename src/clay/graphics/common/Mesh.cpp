@@ -10,10 +10,6 @@
 
 namespace clay {
 
-
-
-
-
 Mesh processMesh(BaseGraphicsContext& gContext, aiMesh* mesh, const aiScene* scene) {
     std::vector<Mesh::Vertex> vertices;
     std::vector<unsigned int> indices;
@@ -165,7 +161,6 @@ Mesh::Mesh(Mesh&& other) noexcept
     mVertexBufferMemory_ = other.mVertexBufferMemory_;
     mIndexBuffer_ = other.mIndexBuffer_;
     mIndexBufferMemory_ = other.mIndexBufferMemory_;
-    // for now but later just keep the sizes
     mIndicesCount_ = other.mIndicesCount_;
 
     // Null out other's handles
@@ -183,8 +178,7 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept {
         mVertexBufferMemory_ = other.mVertexBufferMemory_;
         mIndexBuffer_ = other.mIndexBuffer_;
         mIndexBufferMemory_ = other.mIndexBufferMemory_;
-        // for now but later just keep the sizes
-        mIndicesCount_ = other.mIndicesCount_;
+
 
         other.mVertexBuffer_ = VK_NULL_HANDLE;
         other.mVertexBufferMemory_ = VK_NULL_HANDLE;

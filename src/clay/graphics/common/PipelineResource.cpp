@@ -14,6 +14,33 @@ PipelineResource::PipelineResource(const PipelineConfig& config)
     createPipeline(config);
 }
 
+// move constructor
+PipelineResource::PipelineResource(PipelineResource&& other)
+    : mGraphicsContext_(other.mGraphicsContext_){
+    mPipelineLayout_ = other.mPipelineLayout_;
+    mPipeline_ = other.mPipeline_;
+    mDescriptorSetLayout_ = other.mDescriptorSetLayout_;
+
+    other.mPipelineLayout_ = VK_NULL_HANDLE;
+    other.mPipeline_ = VK_NULL_HANDLE;
+    other.mDescriptorSetLayout_ = VK_NULL_HANDLE;
+}
+
+// move assignment
+PipelineResource& PipelineResource::operator=(PipelineResource&& other) noexcept {
+    if (this != &other) {
+        finalize();
+        mPipelineLayout_ = other.mPipelineLayout_;
+        mPipeline_ = other.mPipeline_;
+        mDescriptorSetLayout_ = other.mDescriptorSetLayout_;
+
+        other.mPipelineLayout_ = VK_NULL_HANDLE;
+        other.mPipeline_ = VK_NULL_HANDLE;
+        other.mDescriptorSetLayout_ = VK_NULL_HANDLE;
+    }
+    return *this;
+}
+
 PipelineResource::~PipelineResource() {
     finalize();
 }
@@ -105,10 +132,21 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
         throw std::runtime_error("failed to create pipeline layout!");
     }
 
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+
+    for (auto& eachShader: config.pipelineLayoutInfo.shaders) {
+        shaderStages.emplace_back(VkPipelineShaderStageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = eachShader->getStage(),
+            .module = eachShader->getShaderModule(),
+            .pName = "main"
+        });
+    }
+
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount =  static_cast<uint32_t>(config.pipelineLayoutInfo.shaderStages.size());
-    pipelineInfo.pStages = config.pipelineLayoutInfo.shaderStages.data();
+    pipelineInfo.stageCount =  static_cast<uint32_t>(shaderStages.size());
+    pipelineInfo.pStages = shaderStages.data();
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
     pipelineInfo.pViewportState = &viewportState;

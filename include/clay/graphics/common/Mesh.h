@@ -12,6 +12,7 @@
 
 namespace clay {
 
+// TODO template with vertex type?
 class Mesh {
 public:
     struct Vertex {

@@ -22,7 +22,7 @@ public:
         uint32_t height;       // glyph bitmap height in pixels
         int32_t bitmapLeft;    // horizontal offset from pen position to left of glyph
         int32_t bitmapTop;     // vertical offset from pen baseline to top of glyph
-        uint32_t advance;      // horizontal advance in pixels (usually in 1/64th pixels, convert as needed)
+        uint32_t advance;      // horizontal advance in pixels in 1/64th pixels
     };
 
     struct FontVertex {
@@ -34,18 +34,24 @@ public:
         static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
     };
 
-    Font(BaseGraphicsContext& graphicsAPI, utils::FileData& fontFileData, utils::FileData& vertexFileData, utils::FileData& fragmentFileData, UniformBuffer& uniformBuffer);
+    Font(BaseGraphicsContext& graphicsAPI, utils::FileData& fontFileData, ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer);
+
+    // move constructor
+    Font(Font&& other);
+
+    // move assignment
+    Font& operator=(Font&& other) noexcept;
+
+    ~Font();
 
     const PipelineResource& getPipeline() const;
 
     const Material& getMaterial() const;
 
-    ~Font();
-
     const CharacterInfo& getCharacterInfo(char c) const;
 
 private:
-    void createPipeline(utils::FileData& vertexFileData, utils::FileData& fragmentFileData, UniformBuffer& uniformBuffer);
+    void createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer);
 
     BaseGraphicsContext& mGContext_;
 

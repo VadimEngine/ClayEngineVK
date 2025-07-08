@@ -4,6 +4,7 @@
 #include <array>
 // clay
 #include "clay/graphics/common/BaseGraphicsContext.h"
+#include "clay/graphics/common/ShaderModule.h"
 
 namespace clay {
 
@@ -15,7 +16,7 @@ public:
     };
 
     struct PipelineLayoutInfo {
-        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+        std::vector<ShaderModule*> shaders;
         VkVertexInputBindingDescription vertexInputBindingDescription;
         std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
         VkPipelineDepthStencilStateCreateInfo depthStencilState;
@@ -23,13 +24,19 @@ public:
         std::vector<VkPushConstantRange> pushConstants;
     };
 
-    struct PipelineConfig { // TODO group into descriptor set and pipeline for clarity
+    struct PipelineConfig {
         BaseGraphicsContext& graphicsContext;
         PipelineLayoutInfo pipelineLayoutInfo;
         DescriptorSetLayoutInfo bindingLayoutInfo;
     };
 
     PipelineResource(const PipelineConfig& config);
+
+    // move constructor
+    PipelineResource(PipelineResource&& other);
+
+    // move assignment
+    PipelineResource& operator=(PipelineResource&& other) noexcept;
 
     ~PipelineResource();
 

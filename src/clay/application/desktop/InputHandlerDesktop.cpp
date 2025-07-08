@@ -94,6 +94,8 @@ void InputHandlerDesktop::onMouseRelease(MouseEvent::Button button) {
     trimBuffer(mMouseEventQueue_);
 }
 
+// TODO debug why this is causing lag when the mouse moves a lot
+// i think it because the mouse events are never processed so the queue is only ever cleared by trimBuffer()
 void InputHandlerDesktop::onMouseMove(int x, int y) {
     auto button = MouseEvent::Button::NONE;
 

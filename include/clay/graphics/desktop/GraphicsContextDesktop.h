@@ -36,12 +36,6 @@ public:
     
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-        VkDebugUtilsMessageTypeFlagsEXT messageType,
-        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-        void* pUserData);
-
     GraphicsContextDesktop(Window& window);
 
     ~GraphicsContextDesktop();
@@ -94,7 +88,7 @@ public:
 
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes, VkPresentModeKHR desiredMode);
 
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, Window& window);
 
@@ -117,6 +111,8 @@ public:
     void finalize();
 
     VkSampleCountFlagBits getMSAASamples() const;
+
+    void setVSync(bool enabled);
 
 public:
     VkSurfaceKHR mSurface_;
@@ -141,6 +137,10 @@ public:
     std::vector<VkSemaphore> mRenderFinishedSemaphores_;
     std::vector<VkFence> mInFlightFences_;
     std::unique_ptr<UniformBuffer> mCameraUniform_;
+    std::unique_ptr<UniformBuffer> mCameraUniformHeadLocked_;
+
+    Window& mWindow_; // todo remove this
+    bool mVSyncEnabled_;
 };
 
 } // namespace clay

@@ -48,7 +48,7 @@ VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
     }
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL GraphicsContextDesktop::debugCallback(
+VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -59,7 +59,9 @@ VKAPI_ATTR VkBool32 VKAPI_CALL GraphicsContextDesktop::debugCallback(
     return VK_FALSE;
 }
 
-GraphicsContextDesktop::GraphicsContextDesktop(Window& window) {
+GraphicsContextDesktop::GraphicsContextDesktop(Window& window)  
+    : mWindow_(window),
+      mVSyncEnabled_(false) {
     initialize(window);
 }
 
@@ -85,6 +87,12 @@ void GraphicsContextDesktop::initialize(Window& window) {
 
     // create camera uniform
     mCameraUniform_ = std::make_unique<UniformBuffer>(
+        *this,
+        sizeof(clay::BaseScene::CameraConstant),
+        nullptr
+    );
+
+    mCameraUniformHeadLocked_ = std::make_unique<UniformBuffer>(
         *this,
         sizeof(clay::BaseScene::CameraConstant),
         nullptr
@@ -593,7 +601,10 @@ void GraphicsContextDesktop::createSwapChain(Window& mWindow) {
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport(mPhysicalDevice_);
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+    VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    if (!mVSyncEnabled_) {
+        presentMode = chooseSwapPresentMode(swapChainSupport.presentModes, VK_PRESENT_MODE_MAILBOX_KHR);
+    }
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, mWindow);
 
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
@@ -642,7 +653,8 @@ void GraphicsContextDesktop::createSwapChain(Window& mWindow) {
 
 VkSurfaceFormatKHR GraphicsContextDesktop::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     for (const auto& availableFormat : availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        // VK_FORMAT_B8G8R8A8_UNORM 
+        if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
         }
     }
@@ -684,9 +696,9 @@ void GraphicsContextDesktop::createFramebuffers() {
     }
 }
 
-VkPresentModeKHR GraphicsContextDesktop::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
+VkPresentModeKHR GraphicsContextDesktop::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes, VkPresentModeKHR desiredMode) {
     for (const auto& availablePresentMode : availablePresentModes) {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+        if (availablePresentMode == desiredMode) {
             return availablePresentMode;
         }
     }
@@ -712,6 +724,7 @@ VkExtent2D GraphicsContextDesktop::chooseSwapExtent(const VkSurfaceCapabilitiesK
     }
 }
 
+// TODO fix this to not take in window but only the needed information
 void GraphicsContextDesktop::recreateSwapChain(Window& window) {
     auto [width, height] = window.getDimensions();
 
@@ -725,7 +738,6 @@ void GraphicsContextDesktop::recreateSwapChain(Window& window) {
     cleanupSwapChain();
 
     createSwapChain(window);
-    // createSwapChain();
     createImageViews();
     createColorResources();
     createDepthResources();
@@ -818,6 +830,8 @@ void GraphicsContextDesktop::createSyncObjects() {
 void GraphicsContextDesktop::cleanUp() {
     cleanupSwapChain();
     mCameraUniform_.reset();
+    mCameraUniformHeadLocked_.reset();
+
     vkDestroyRenderPass(mDevice_, mRenderPass_, nullptr);
 
     vkDestroyDescriptorPool(mDevice_, mDescriptorPool_, nullptr);
@@ -858,6 +872,10 @@ VkSampleCountFlagBits GraphicsContextDesktop::getMSAASamples() const {
     return mMSAASamples_;
 }
 
+void GraphicsContextDesktop::setVSync(bool enabled) {
+    mVSyncEnabled_ = enabled;
+    recreateSwapChain(mWindow_);
+}
 
 
 } // namespace clay

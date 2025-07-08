@@ -17,4 +17,6 @@ struct ImageData {
     int channels;
 };
 
+void convertRGBtoRGBA(ImageData& image);
+
 } // namespace clay::utils

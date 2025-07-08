@@ -1,8 +1,10 @@
 #ifdef CLAY_PLATFORM_DESKTOP
 
+#include <iostream>
 // clay
 #include "clay/utils/desktop/UtilsDesktop.h"
 #include "clay/gui/desktop/ImGuiComponentDesktop.h"
+#include "clay/utils/common/Logger.h"
 // class
 #include "clay/application/desktop/AppDesktop.h"
 
@@ -68,6 +70,12 @@ void AppDesktop::update() {
 void AppDesktop::render() {
     vkWaitForFences(mGraphicsContextDesktop_.getDevice(), 1, &mGraphicsContextDesktop_.mInFlightFences_[mGraphicsContextDesktop_.mCurrentFrame_], VK_TRUE, UINT64_MAX);
 
+    if (tempVSyncFlag) {
+        mGraphicsContextDesktop_.setVSync(tempVSyncValue);
+        mGraphicsContextDesktop_.recreateSwapChain(mWindow_);
+        tempVSyncFlag = false;
+    }
+
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
         mpGraphicsContext_->getDevice(), 
@@ -86,23 +94,21 @@ void AppDesktop::render() {
     }
 
     vkResetFences(mpGraphicsContext_->getDevice(), 1, &mGraphicsContextDesktop_.mInFlightFences_[mGraphicsContextDesktop_.mCurrentFrame_]);
-
     vkResetCommandBuffer(mGraphicsContextDesktop_.mCommandBuffers_[mGraphicsContextDesktop_.mCurrentFrame_], /*VkCommandBufferResetFlagBits*/ 0);
+
     recordCommandBuffer(mGraphicsContextDesktop_.mCommandBuffers_[mGraphicsContextDesktop_.mCurrentFrame_], imageIndex);
 
+    VkSemaphore waitSemaphores[] = {mGraphicsContextDesktop_.mImageAvailableSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_]};
+    VkSemaphore signalSemaphores[] = {mGraphicsContextDesktop_.mRenderFinishedSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_]};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore waitSemaphores[] = {mGraphicsContextDesktop_.mImageAvailableSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_]};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
-
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &mGraphicsContextDesktop_.mCommandBuffers_[mGraphicsContextDesktop_.mCurrentFrame_];
-
-    VkSemaphore signalSemaphores[] = {mGraphicsContextDesktop_.mRenderFinishedSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_]};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -110,20 +116,16 @@ void AppDesktop::render() {
         throw std::runtime_error("failed to submit draw command buffer!");
     }
 
+    VkSwapchainKHR swapChains[] = {mGraphicsContextDesktop_.mSwapChain_};
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = {mGraphicsContextDesktop_.mSwapChain_};
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
-
     presentInfo.pImageIndices = &imageIndex;
 
     result = vkQueuePresentKHR(mGraphicsContextDesktop_.mPresentQueue_, &presentInfo);
-
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || mFramebufferResized_) {
         mFramebufferResized_ = false;
         mGraphicsContextDesktop_.recreateSwapChain(mWindow_);

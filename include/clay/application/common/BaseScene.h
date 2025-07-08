@@ -8,7 +8,7 @@
 #include "clay/utils/common/Utils.h"
 #include "clay/graphics/common/Model.h"
 #include "clay/graphics/common/Camera.h"
-#include "clay/entity/Entity.h"
+#include "clay/application/common/Resources.h"
 
 namespace clay {
 
@@ -37,10 +37,13 @@ public:
 
     BaseApp& getApp();
 
+    Resources& getResources();
+
     Camera* getFocusCamera();
 
 protected:
     BaseApp& mApp_;
+    Resources mResources_;
     Camera mCamera_;
     Camera* mpFocusCamera_;
 };

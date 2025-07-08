@@ -83,7 +83,7 @@ void populateImage(VkImage image, const FT_Bitmap& bitmap, BaseGraphicsContext& 
     vkFreeMemory(mGContext_.getDevice(), stagingBufferMemory, nullptr);
 }
 
-Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, utils::FileData& vertexFileData, utils::FileData& fragmentFileData, UniformBuffer& uniformBuffer)
+Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer)
     : mGContext_(gContext){
 
     mCharacterImage_.fill(VK_NULL_HANDLE);
@@ -113,7 +113,6 @@ Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, utils::
     }
 
     FT_Set_Pixel_Sizes(face, 0, 48);
-
 
     for (unsigned char c = 0; c < 128; ++c) {
         if (FT_Load_Char(face, c, FT_LOAD_RENDER)) {
@@ -195,7 +194,50 @@ Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, utils::
         mCharacterImageView_[c] = glyphImageView;
     }
 
-    createPipeline(vertexFileData, fragmentFileData, uniformBuffer);
+    createPipeline(vertShader, fragShader, uniformBuffer);
+}
+
+// move constructor
+Font::Font(Font&& other)
+    : mGContext_(other.mGContext_) {
+
+    mSampler_ = other.mSampler_;
+    mCharacterFrontInfo_ = other.mCharacterFrontInfo_;
+    mCharacterImage_ = other.mCharacterImage_;
+    mCharacterMemory_ = other.mCharacterMemory_;
+    mCharacterImageView_ = other.mCharacterImageView_;
+
+    mPipeline_ = std::move(other.mPipeline_);
+    mMaterial_ = std::move(other.mMaterial_);
+
+    other.mSampler_ = VK_NULL_HANDLE;
+    for (size_t i = 0; i < 128; ++i) {
+        other.mCharacterImageView_[i] = VK_NULL_HANDLE;
+        other.mCharacterImage_[i] = VK_NULL_HANDLE;
+        other.mCharacterMemory_[i] = VK_NULL_HANDLE;
+    }
+}
+
+// move assignment
+Font& Font::operator=(Font&& other) noexcept {
+    if (this != &other) {
+        mSampler_ = other.mSampler_;
+        mCharacterFrontInfo_ = other.mCharacterFrontInfo_;
+        mCharacterImage_ = other.mCharacterImage_;
+        mCharacterMemory_ = other.mCharacterMemory_;
+        mCharacterImageView_ = other.mCharacterImageView_;
+
+        mPipeline_ = std::move(other.mPipeline_);
+        mMaterial_ = std::move(other.mMaterial_);
+
+        other.mSampler_ = VK_NULL_HANDLE;
+        for (size_t i = 0; i < 128; ++i) {
+            other.mCharacterImageView_[i] = VK_NULL_HANDLE;
+            other.mCharacterImage_[i] = VK_NULL_HANDLE;
+            other.mCharacterMemory_[i] = VK_NULL_HANDLE;
+        }
+    }
+    return *this;
 }
 
 Font::~Font() {
@@ -230,32 +272,16 @@ const Font::CharacterInfo& Font::getCharacterInfo(char c) const {
     return mCharacterFrontInfo_[static_cast<int>(c)];
 }
 
-void Font::createPipeline(utils::FileData& vertexFileData, utils::FileData& fragmentFileData, UniformBuffer& uniformBuffer) {
-    VkShaderModule vertexShader = mGContext_.createShader(
-        {VK_SHADER_STAGE_VERTEX_BIT, vertexFileData.data.get(), vertexFileData.size}
-    );
-    VkShaderModule fragmentShader = mGContext_.createShader(
-        {VK_SHADER_STAGE_FRAGMENT_BIT, fragmentFileData.data.get(), fragmentFileData.size}
-    );
+void Font::createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer) {
 
     clay::PipelineResource::PipelineConfig pipelineConfig{
         .graphicsContext = mGContext_
     };
 
-    pipelineConfig.pipelineLayoutInfo.shaderStages = {
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = vertexShader,
-            .pName = "main"
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = fragmentShader,
-            .pName = "main"
-        }
+    pipelineConfig.pipelineLayoutInfo.shaders = {
+        &vertShader, &fragShader
     };
+
     auto vertexAttrib = Font::FontVertex::getAttributeDescriptions();
     pipelineConfig.pipelineLayoutInfo.attributeDescriptions = {vertexAttrib.begin(), vertexAttrib.end()};
     pipelineConfig.pipelineLayoutInfo.vertexInputBindingDescription = Font::FontVertex::getBindingDescription();
@@ -357,9 +383,6 @@ void Font::createPipeline(utils::FileData& vertexFileData, utils::FileData& frag
     }
 
     mMaterial_ = std::make_unique<Material>(matConfig);
-
-    vkDestroyShaderModule(mGContext_.getDevice(), vertexShader, nullptr);
-    vkDestroyShaderModule(mGContext_.getDevice(), fragmentShader, nullptr);
 }
 
 } // namespace clay
