@@ -2,6 +2,9 @@
 
 // third party
 #include <glm/glm.hpp>
+// clay
+#include "clay/utils/common/Logger.h"
+// class
 #include "clay/graphics/xr/GraphicsContextXR.h"
 
 #define VULKAN_CHECK(x, y)                                                                     \
@@ -143,6 +146,7 @@ bool GraphicsContextXR::checkValidationLayerSupport() {
     return true;
 }
 
+// TODO remove this
 GraphicsContextXR::GraphicsContextXR() {
     // Instance
     VkApplicationInfo ai;
@@ -438,7 +442,7 @@ GraphicsContextXR::GraphicsContextXR(XrInstance m_xrInstance, XrSystemId systemI
 
     VkInstanceCreateInfo instanceCI;
     instanceCI.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    //instanceCI.pNext = nullptr;
+    instanceCI.pNext = nullptr; // this was commented out
     if (enableValidation) {
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         populateDebugMessengerCreateInfo(debugCreateInfo);

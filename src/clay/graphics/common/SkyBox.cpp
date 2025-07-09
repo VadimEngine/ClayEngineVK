@@ -19,7 +19,7 @@ void SkyBox::render(VkCommandBuffer cmdBuffer) {
     struct PushConstants {
         glm::mat4 model;
         glm::vec4 color;
-    } push;
+    } push{};
 
     push.model = mModelMat_;
     push.color = {1,1,1,1};
@@ -27,12 +27,11 @@ void SkyBox::render(VkCommandBuffer cmdBuffer) {
     mMaterial_.pushConstants(
         cmdBuffer,
         &push,
-        sizeof(glm::mat4),
+        sizeof(PushConstants),
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT
     );
 
     vkCmdDrawIndexed(cmdBuffer, mMesh_.getIndicesCount(), 1, 0, 0, 0);
 }
-
 
 } // namespace clay

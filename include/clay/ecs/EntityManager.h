@@ -40,6 +40,9 @@ public:
 
     void addSpriteRenderable(Entity e, const SpriteRenderable& comp);
 
+    void addMetaData(Entity e, const EntityMetadata& comp);
+
+
     // for now, have update/render in here?
     void render(VkCommandBuffer cmdBuffer);
 
@@ -52,7 +55,7 @@ public:
     std::vector<Entity> mFreeEntities;
     std::set<Entity> mCurrentEntities_;
 
-	std::array<Signature, MAX_ENTITIES> mSignatures{};
+    std::array<Signature, MAX_ENTITIES> mSignatures{};
 
     std::array<Transform, MAX_ENTITIES> mTransforms;
     std::array<ModelRenderable, MAX_ENTITIES> mModelRenderable;
@@ -60,6 +63,7 @@ public:
     std::array<SpriteRenderable, MAX_ENTITIES> mSpriteRenderables; 
     std::array<Collider, MAX_ENTITIES> mColliders;
     std::array<RigidBody, MAX_ENTITIES> mRigidBodies;
+    std::array<EntityMetadata, MAX_ENTITIES> mMetaData;
 };
 
 } // namespace clay::ecs

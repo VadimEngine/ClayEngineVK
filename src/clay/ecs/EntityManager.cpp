@@ -2,6 +2,8 @@
 
 namespace clay::ecs {
 
+// TODO template add/remove
+// todo see if scene specific resources can be used
 
 EntityManager::EntityManager(BaseGraphicsContext& gContext, Resources& resources) 
     : mResources_(resources), mRenderSystem_(gContext, resources) {}
@@ -57,6 +59,11 @@ void EntityManager::addRigidBody(Entity e, const RigidBody& comp) {
 void EntityManager::addSpriteRenderable(Entity e, const SpriteRenderable& comp) {
     mSpriteRenderables[e] = comp;
     mSignatures[e].set(ComponentType::SPRITE);
+}
+
+void EntityManager::addMetaData(Entity e, const EntityMetadata& comp) {
+    mMetaData[e] = comp;
+    mSignatures[e].set(ComponentType::METADATA);
 }
 
 void EntityManager::render(VkCommandBuffer cmdBuffer) {

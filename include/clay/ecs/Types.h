@@ -66,10 +66,10 @@ struct SpriteRenderable {
     glm::vec4 mColor_ = {1,1,1,1};
 };
 
-struct EntityMeta {
-    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::TEXT);
+struct EntityMetadata {
+    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::METADATA);
 
-    bool enabled;
+    bool enabled = true;
 };
 
 struct RigidBody {

@@ -4,24 +4,6 @@
 #define INSTANTIATE_RESOURCE_POOL(Type)                                         \
 template class Resources::ResourcePool<Type>;                                   \
                                                                                 \
-template Resources::ResourcePool<Type>::ResourcePool(BaseGraphicsContext&);     \
-                                                                                \
-template Resources::Handle<Type>                                                \
-    Resources::ResourcePool<Type>::loadResource(                                \
-        const std::vector<std::string>&, const std::string&);                   \
-                                                                                \
-template Resources::Handle<Type>                                                \
-    Resources::ResourcePool<Type>::add(Type&&, const std::string&);             \
-                                                                                \
-template void                                                                   \
-    Resources::ResourcePool<Type>::remove(Resources::Handle<Type>);             \
-                                                                                \
-template Type&                                                                  \
-    Resources::ResourcePool<Type>::operator[](Resources::Handle<Type>);         \
-                                                                                \
-template Resources::Handle<Type>                                                \
-    Resources::ResourcePool<Type>::getHandle(const std::string&) const;         \
-                                                                                \
 template Resources::Handle<Type>                                                \
     Resources::loadResource<Type>(                                              \
         const std::vector<std::string>& resourcePath,                           \
@@ -39,7 +21,7 @@ template Type& Resources::operator[](Handle<Type> handle);                      
 template Resources::Handle<Type>                                                \
     Resources::getHandle(const std::string& resourceName);                      \
                                                                                 \
-template void Resources::release<Type>(Handle<Type> handle);                     
+template void Resources::release<Type>(Handle<Type> handle);
 
 
 namespace clay {
@@ -85,8 +67,8 @@ Resources::Handle<T> Resources::ResourcePool<T>::loadResource(const std::vector<
     } else if constexpr(std::is_same_v<T, Material>) {
         throw std::runtime_error("Load not implemented for Material");
     } else if constexpr (std::is_same_v<T, Audio>) {
-        //utils::FileData loadedFile = loadFileToMemory(resourcePaths[0]);
-        //mAudios_[resourceName] = std::make_unique<Audio>(loadedFile);
+        utils::FileData loadedFile = loadFileToMemory(resourcePaths[0]);
+        return add(Audio(loadedFile), resourceName);
         throw std::runtime_error("Load not implemented for Audio");
     }
     else if constexpr (std::is_same_v<T, Font>) {
@@ -175,9 +157,7 @@ Resources::Handle<T> Resources::loadResource(const std::vector<std::string>& res
     } else if constexpr(std::is_same_v<T, Material>) {
         throw std::runtime_error("Load not implemented for Material");
     } else if constexpr (std::is_same_v<T, Audio>) {
-        //utils::FileData loadedFile = loadFileToMemory(resourcePaths[0]);
-        //mAudios_[resourceName] = std::make_unique<Audio>(loadedFile);
-        throw std::runtime_error("Load not implemented for Audio");
+        return mAudiosPool_.loadResource(resourcePaths, resourceName);
     }
     else if constexpr (std::is_same_v<T, Font>) {
         throw std::runtime_error("Load not implemented for Font");
