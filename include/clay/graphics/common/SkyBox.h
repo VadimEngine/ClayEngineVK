@@ -13,10 +13,10 @@ public:
 
     void update(glm::quat& cameraOrientation, float dt);
 
-    void render(VkCommandBuffer cmdBuffer);
+    void render(vk::CommandBuffer cmdBuffer);
 
 private:
-
+    // TODO mesh/material Id
     Mesh& mMesh_;
     Material& mMaterial_;
     glm::mat4 mModelMat_;

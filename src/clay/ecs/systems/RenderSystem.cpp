@@ -7,7 +7,7 @@ namespace clay::ecs {
 RenderSystem::RenderSystem(BaseGraphicsContext& gContext, Resources& resources)
     : mGContext_(gContext), mResources_(resources) {}
 
-void RenderSystem::render(EntityManager& entityManager, VkCommandBuffer cmdBuffer) {
+void RenderSystem::render(EntityManager& entityManager, vk::CommandBuffer cmdBuffer) {
     // TODO for (auto chunk : view<MeshHandle, Transform>()) {
     for (clay::ecs::Entity e: entityManager.mCurrentEntities_) {
         if (entityManager.mSignatures[e][clay::ecs::ComponentType::METADATA] && !entityManager.mMetaData[e].enabled) {
@@ -48,12 +48,14 @@ void RenderSystem::render(EntityManager& entityManager, VkCommandBuffer cmdBuffe
             push.color = text.mColor_;
             push.model = translationMat * rotationMatrix * scaleMat * glm::scale(glm::mat4(1.0f), text.mScale_);
 
-            text.mpFont_->getMaterial().pushConstants(cmdBuffer, &push, sizeof(PushConstants),  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+            text.mpFont_->getMaterial().pushConstants(cmdBuffer, &push, sizeof(PushConstants), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
 
-            VkBuffer vertexBuffers[] = { text.mVertexBuffer_ };
-            VkDeviceSize offsets[] = { 0 };
-            vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
-            vkCmdDraw(cmdBuffer, static_cast<uint32_t>(text.mVertices_.size()), 1, 0, 0);
+            vk::Buffer vertexBuffers[] = { text.mVertexBuffer_ };
+            vk::DeviceSize offsets[] = { 0 };
+
+            cmdBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+            cmdBuffer.draw(static_cast<uint32_t>(text.mVertices_.size()), 1, 0, 0);
+
         } else if (entityManager.mSignatures[e][clay::ecs::ComponentType::TRANSFORM] && entityManager.mSignatures[e][clay::ecs::ComponentType::SPRITE]) {
             clay::ecs::Transform& transform = entityManager.mTransforms[e];
             clay::ecs::SpriteRenderable& sprite = entityManager.mSpriteRenderables[e];
@@ -78,11 +80,11 @@ void RenderSystem::render(EntityManager& entityManager, VkCommandBuffer cmdBuffe
                 cmdBuffer,
                 &push,
                 sizeof(push),
-                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
             );
 
             sprite.mpMesh_->bindMesh(cmdBuffer);
-            vkCmdDrawIndexed(cmdBuffer, sprite.mpMesh_->getIndicesCount(), 1, 0, 0, 0);
+            cmdBuffer.drawIndexed(sprite.mpMesh_->getIndicesCount(), 1, 0, 0, 0);
         }
     }
 }

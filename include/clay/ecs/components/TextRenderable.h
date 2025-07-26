@@ -21,14 +21,14 @@ public:
 
     void finalize(BaseGraphicsContext& gContext);
 
-    void render(VkCommandBuffer cmdBuffer, const glm::mat4& parentModelMat);
+    void render(vk::CommandBuffer cmdBuffer, const glm::mat4& parentModelMat);
 
     glm::mat4 getModelMatrix();
 
     std::string mText_;
     Font* mpFont_;
-    VkBuffer mVertexBuffer_;
-    VkDeviceMemory mVertexBufferMemory_;
+    vk::Buffer mVertexBuffer_;
+    vk::DeviceMemory mVertexBufferMemory_;
     std::vector<Font::FontVertex> mVertices_;
     glm::vec3 mPosition_ = {0.0f, 0.0f, 0.0f};
     glm::quat mOrientation_ = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);

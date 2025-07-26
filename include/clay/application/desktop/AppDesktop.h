@@ -41,7 +41,7 @@ public:
 
 
 protected:
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
     
     Window& mWindow_;
 

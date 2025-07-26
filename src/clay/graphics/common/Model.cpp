@@ -28,7 +28,7 @@ void Model::addElement(const ModelElement& element) {
     mModelGroups_.push_back(element);
 }
 
-void Model::render(VkCommandBuffer cmdBuffer, const void* userPushData, uint32_t userPushSize) {
+void Model::render(vk::CommandBuffer cmdBuffer, const void* userPushData, uint32_t userPushSize) {
     for (auto eachElement: mModelGroups_) {
         Mesh* pMesh = eachElement.mesh;
         Material* pMaterial = eachElement.material;
@@ -47,12 +47,11 @@ void Model::render(VkCommandBuffer cmdBuffer, const void* userPushData, uint32_t
             cmdBuffer,
             pushDataCopy.data(),
             userPushSize,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT
+            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
         );
 
-        vkCmdDrawIndexed(cmdBuffer, pMesh->getIndicesCount(), 1, 0, 0, 0);
+        cmdBuffer.drawIndexed(pMesh->getIndicesCount(), 1, 0, 0, 0);
     }
 }
-
 
 } // namespace clay

@@ -29,9 +29,9 @@ public:
         glm::vec4 vertex;    // xy = position, zw = texCoord
         int glyphIndex;
 
-        static VkVertexInputBindingDescription getBindingDescription();
+        static vk::VertexInputBindingDescription getBindingDescription();
 
-        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
+        static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions();
     };
 
     Font(BaseGraphicsContext& graphicsAPI, utils::FileData& fontFileData, ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer);
@@ -55,13 +55,13 @@ private:
 
     BaseGraphicsContext& mGContext_;
 
-    VkSampler mSampler_;
+    vk::Sampler mSampler_;
 
     std::array<CharacterInfo, 128> mCharacterFrontInfo_;
 
-    std::array<VkImage, 128> mCharacterImage_;
-    std::array<VkDeviceMemory, 128> mCharacterMemory_;
-    std::array<VkImageView, 128> mCharacterImageView_;
+    std::array<vk::Image, 128> mCharacterImage_;
+    std::array<vk::DeviceMemory, 128> mCharacterMemory_;
+    std::array<vk::ImageView, 128> mCharacterImageView_;
 
     std::unique_ptr<PipelineResource> mPipeline_;
     std::unique_ptr<Material> mMaterial_;

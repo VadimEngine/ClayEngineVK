@@ -19,21 +19,21 @@ public:
 
     void initialize(utils::ImageData& imageData);
 
-    void setSampler(VkSampler sampler);
+    void setSampler(vk::Sampler sampler);
 
-    VkImageView getImageView() const;
+    vk::ImageView getImageView() const;
 
-    VkSampler getSampler() const;
+    vk::Sampler getSampler() const;
     
     void finalize();
 
 private:
     BaseGraphicsContext& mGraphicsContext_;
 
-    VkImage mImage_;
-    VkDeviceMemory mImageMemory_;
-    VkImageView mImageView_;
-    VkSampler mSampler_; // does not own
+    vk::Image mImage_;
+    vk::DeviceMemory mImageMemory_;
+    vk::ImageView mImageView_;
+    vk::Sampler mSampler_; // does not own
 
 };
 

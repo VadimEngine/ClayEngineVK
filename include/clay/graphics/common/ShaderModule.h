@@ -3,7 +3,7 @@
 #include <stdexcept>
 // third party
 // vulkan
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 // clay
 #include "clay/utils/common/Utils.h"
 
@@ -11,18 +11,18 @@ namespace clay {
 
 class ShaderModule {
 public:
-    ShaderModule(VkDevice device,  VkShaderStageFlagBits stage, const utils::FileData& fileData);
+    ShaderModule(vk::Device device, vk::ShaderStageFlagBits stage, const utils::FileData& fileData);
 
     ~ShaderModule();
 
-    VkShaderModule getShaderModule() const;
+    vk::ShaderModule getShaderModule() const;
     
-    VkShaderStageFlagBits getStage() const;
+    vk::ShaderStageFlagBits getStage() const;
 
 private:
-    VkDevice mDevice_;
-    VkShaderStageFlagBits mStage_;
-    VkShaderModule mShaderModule_{VK_NULL_HANDLE};
+    vk::Device mDevice_;
+    vk::ShaderStageFlagBits mStage_;
+    vk::ShaderModule mShaderModule_;
 };
 
 }// namespace clay

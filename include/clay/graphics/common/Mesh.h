@@ -22,9 +22,9 @@ public:
         glm::vec3 tangent;
         glm::vec3 bitangent;
 
-        static VkVertexInputBindingDescription getBindingDescription();
-
-        static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions();
+        static vk::VertexInputBindingDescription getBindingDescription();
+        
+        static std::array<vk::VertexInputAttributeDescription, 5> getAttributeDescriptions();
     };
 
     static void parseObjFile(BaseGraphicsContext& gContext, utils::FileData& fileData, std::vector<Mesh>& meshList);
@@ -41,11 +41,11 @@ public:
     
     ~Mesh();
 
-    void bindMesh(VkCommandBuffer cmdBuffer);
+    void bindMesh(vk::CommandBuffer cmdBuffer);
 
-    VkBuffer getVertexBuffer() const;
+    vk::Buffer getVertexBuffer() const;
 
-    VkBuffer getIndexBuffer() const;
+    vk::Buffer getIndexBuffer() const;
 
     uint32_t getIndicesCount() const;
 
@@ -61,10 +61,10 @@ private:
     BaseGraphicsContext& mGraphicsContext_;
 
     uint32_t mIndicesCount_ = 0;
-    VkBuffer mVertexBuffer_ = VK_NULL_HANDLE;
-    VkDeviceMemory mVertexBufferMemory_ = VK_NULL_HANDLE;
-    VkBuffer mIndexBuffer_ = VK_NULL_HANDLE;
-    VkDeviceMemory mIndexBufferMemory_ = VK_NULL_HANDLE;
+    vk::Buffer mVertexBuffer_{};
+    vk::DeviceMemory mVertexBufferMemory_{};
+    vk::Buffer mIndexBuffer_{};
+    vk::DeviceMemory mIndexBufferMemory_{};
 };
 
 } // namespace clay

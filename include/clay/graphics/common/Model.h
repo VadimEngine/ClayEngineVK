@@ -31,7 +31,7 @@ public:
 
     void addElement(const ModelElement& element);
 
-    void render(VkCommandBuffer cmdBuffer, const void* userPushData, uint32_t userPushSize);
+    void render(vk::CommandBuffer cmdBuffer, const void* userPushData, uint32_t userPushSize);
 
 private:
     BaseGraphicsContext& mGraphicsContext_;

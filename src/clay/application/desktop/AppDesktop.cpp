@@ -18,7 +18,7 @@ AppDesktop::AppDesktop(Window& window) :
 }
 
 AppDesktop::~AppDesktop() {
-    vkDeviceWaitIdle(mpGraphicsContext_->getDevice()); // wait to allow deleteing current scene
+    mpGraphicsContext_->getDevice().waitIdle(); // wait to allow deleteing current scene
     // delete both scenes
     mSceneBuffer_[0].reset();
     mSceneBuffer_[1].reset();
@@ -35,7 +35,7 @@ void AppDesktop::run() {
         render();
     }
     
-    vkDeviceWaitIdle(mpGraphicsContext_->getDevice());
+    mpGraphicsContext_->getDevice().waitIdle();
 }
 
 void AppDesktop::update() {
@@ -57,7 +57,7 @@ void AppDesktop::update() {
     }
 
     if (mSceneBuffer_[1]) {
-        vkDeviceWaitIdle(mpGraphicsContext_->getDevice()); // wait to allow deleteing current scene
+        mpGraphicsContext_->getDevice().waitIdle(); // wait to allow deleteing current scene
         // switch to scene in back buffer
         mSceneBuffer_[0] = std::move(mSceneBuffer_[1]);
     }
@@ -68,7 +68,12 @@ void AppDesktop::update() {
 }
 
 void AppDesktop::render() {
-    vkWaitForFences(mGraphicsContextDesktop_.getDevice(), 1, &mGraphicsContextDesktop_.mInFlightFences_[mGraphicsContextDesktop_.mCurrentFrame_], VK_TRUE, UINT64_MAX);
+    mGraphicsContextDesktop_.getDevice().waitForFences(
+        1, 
+        &mGraphicsContextDesktop_.mInFlightFences_[mGraphicsContextDesktop_.mCurrentFrame_], 
+        vk::True, 
+        UINT64_MAX
+    );
 
     if (tempVSyncFlag) {
         mGraphicsContextDesktop_.setVSync(tempVSyncValue);
@@ -77,59 +82,57 @@ void AppDesktop::render() {
     }
 
     uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(
-        mpGraphicsContext_->getDevice(), 
+
+    vk::Result result = mpGraphicsContext_->getDevice().acquireNextImageKHR(
         mGraphicsContextDesktop_.mSwapChain_, 
         UINT64_MAX,
         mGraphicsContextDesktop_.mImageAvailableSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_],
-        VK_NULL_HANDLE, 
+        nullptr, 
         &imageIndex
-    );
+     );
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    if (result == vk::Result::eErrorOutOfDateKHR) {
         mGraphicsContextDesktop_.recreateSwapChain(mWindow_);
         return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    vkResetFences(mpGraphicsContext_->getDevice(), 1, &mGraphicsContextDesktop_.mInFlightFences_[mGraphicsContextDesktop_.mCurrentFrame_]);
-    vkResetCommandBuffer(mGraphicsContextDesktop_.mCommandBuffers_[mGraphicsContextDesktop_.mCurrentFrame_], /*VkCommandBufferResetFlagBits*/ 0);
+    mpGraphicsContext_->getDevice().resetFences(1, &mGraphicsContextDesktop_.mInFlightFences_[mGraphicsContextDesktop_.mCurrentFrame_]);
+    mGraphicsContextDesktop_.mCommandBuffers_[mGraphicsContextDesktop_.mCurrentFrame_].reset();
 
     recordCommandBuffer(mGraphicsContextDesktop_.mCommandBuffers_[mGraphicsContextDesktop_.mCurrentFrame_], imageIndex);
 
-    VkSemaphore waitSemaphores[] = {mGraphicsContextDesktop_.mImageAvailableSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_]};
-    VkSemaphore signalSemaphores[] = {mGraphicsContextDesktop_.mRenderFinishedSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_]};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    vk::Semaphore waitSemaphores[] = {mGraphicsContextDesktop_.mImageAvailableSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_]};
+    vk::Semaphore signalSemaphores[] = {mGraphicsContextDesktop_.mRenderFinishedSemaphores_[mGraphicsContextDesktop_.mCurrentFrame_]};
+    vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
     
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &mGraphicsContextDesktop_.mCommandBuffers_[mGraphicsContextDesktop_.mCurrentFrame_];
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
+    vk::SubmitInfo submitInfo{
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = waitSemaphores,
+        .pWaitDstStageMask = waitStages,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &mGraphicsContextDesktop_.mCommandBuffers_[mGraphicsContextDesktop_.mCurrentFrame_],
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = signalSemaphores,
+    };
 
-    if (vkQueueSubmit(mGraphicsContextDesktop_.mGraphicsQueue_, 1, &submitInfo, mGraphicsContextDesktop_.mInFlightFences_[mGraphicsContextDesktop_.mCurrentFrame_]) != VK_SUCCESS) {
-        throw std::runtime_error("failed to submit draw command buffer!");
-    }
+    mGraphicsContextDesktop_.mGraphicsQueue_.submit(1, &submitInfo, mGraphicsContextDesktop_.mInFlightFences_[mGraphicsContextDesktop_.mCurrentFrame_]);
 
-    VkSwapchainKHR swapChains[] = {mGraphicsContextDesktop_.mSwapChain_};
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
+    vk::SwapchainKHR swapChains[] = {mGraphicsContextDesktop_.mSwapChain_};
+    vk::PresentInfoKHR presentInfo{
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = signalSemaphores,
+        .swapchainCount = 1,
+        .pSwapchains = swapChains,
+        .pImageIndices = &imageIndex,
+    };
 
-    result = vkQueuePresentKHR(mGraphicsContextDesktop_.mPresentQueue_, &presentInfo);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || mFramebufferResized_) {
+    result = mGraphicsContextDesktop_.mPresentQueue_.presentKHR(presentInfo);
+    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || mFramebufferResized_) {
         mFramebufferResized_ = false;
         mGraphicsContextDesktop_.recreateSwapChain(mWindow_);
-    } else if (result != VK_SUCCESS) {
+    } else if (result != vk::Result::eSuccess) {
         throw std::runtime_error("failed to present swap chain image!");
     }
 
@@ -157,51 +160,49 @@ GraphicsContextDesktop& AppDesktop::getGraphicsContextDesktop() {
     return mGraphicsContextDesktop_;
 }
 
-void AppDesktop::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+void AppDesktop::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
+    commandBuffer.begin(vk::CommandBufferBeginInfo{});
 
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
-    }
+    vk::RenderPassBeginInfo renderPassInfo{
+        .renderPass = mpGraphicsContext_->mRenderPass_,
+        .framebuffer = mGraphicsContextDesktop_.mSwapChainFramebuffers_[imageIndex],
+        .renderArea = {
+            .offset = {0, 0},
+            .extent = mGraphicsContextDesktop_.mSwapChainExtent_,
+        }
+    };
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = mpGraphicsContext_->mRenderPass_;
-    renderPassInfo.framebuffer = mGraphicsContextDesktop_.mSwapChainFramebuffers_[imageIndex];
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = mGraphicsContextDesktop_.mSwapChainExtent_;
-
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
+    std::array<vk::ClearValue, 2> clearValues{};
+    clearValues[0].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
+    clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
 
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
     renderPassInfo.pClearValues = clearValues.data();
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    commandBuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
     {
-        VkViewport viewport{};
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = (float)mGraphicsContextDesktop_.mSwapChainExtent_.width;
-        viewport.height = (float)mGraphicsContextDesktop_.mSwapChainExtent_.height;
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vk::Viewport viewport{
+            viewport.x = 0.0f,
+            viewport.y = 0.0f,
+            viewport.width = (float)mGraphicsContextDesktop_.mSwapChainExtent_.width,
+            viewport.height = (float)mGraphicsContextDesktop_.mSwapChainExtent_.height,
+            viewport.minDepth = 0.0f,
+            viewport.maxDepth = 1.0f
+        };
 
-        VkRect2D scissor{};
-        scissor.offset = {0, 0};
-        scissor.extent = mGraphicsContextDesktop_.mSwapChainExtent_;
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        commandBuffer.setViewport(0, 1, &viewport);
+
+        vk::Rect2D scissor{
+            .offset = {0, 0},
+            .extent = mGraphicsContextDesktop_.mSwapChainExtent_
+        };
+
+        commandBuffer.setScissor(0, 1, &scissor);
 
         mSceneBuffer_[0]->render(commandBuffer);
     }
-    vkCmdEndRenderPass(commandBuffer);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
-    }
+    commandBuffer.endRenderPass();
+    commandBuffer.end();
 }
 
 } // namespace clay

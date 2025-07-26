@@ -82,7 +82,7 @@ private:
 
     ResourcePool<Mesh> mMeshesPool_;
     ResourcePool<Model> mModelsPool_;
-    ResourcePool<VkSampler> mSamplersPool_;
+    ResourcePool<vk::Sampler> mSamplersPool_;
     ResourcePool<Texture> mTexturesPool_;
     ResourcePool<PipelineResource> mPipePool_;
     ResourcePool<Material> mMaterialsPool_;
