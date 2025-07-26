@@ -127,7 +127,7 @@ bool Window::isRunning() const {
     return !glfwWindowShouldClose(mpGLFWWindow_);
 }
 
-VkSurfaceKHR Window::createSurface(VkInstance& instance) {
+vk::SurfaceKHR Window::createSurface(vk::Instance& instance) {
     VkSurfaceKHR surface;
 
     // Create the surface using GLFW and Vulkan instance
@@ -135,8 +135,7 @@ VkSurfaceKHR Window::createSurface(VkInstance& instance) {
         throw std::runtime_error("failed to create window surface!");
     }
 
-    // Return the surface
-    return surface;
+    return (vk::SurfaceKHR)surface;
 }
 
 void Window::pushEvent(WindowEvent evt) {

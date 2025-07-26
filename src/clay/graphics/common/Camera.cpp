@@ -4,11 +4,12 @@
 namespace clay {
 
 Camera::Camera(const glm::vec3& position) {
+    // TODO move to initializer list
     mPosition_ = position;
     mForward_ = glm::vec3(0.0f, 0.0f, -1.0f);
     mUp_ = glm::vec3(0.0f, 1.0f, 0.0f);
     mRight_ = glm::normalize(glm::cross(mForward_, glm::vec3(0.0f, 1.0f, 0.0f)));
-    mOrientation_ = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion
+    mOrientation_ = glm::identity<glm::quat>();
     updateCameraVectors();
 }
 

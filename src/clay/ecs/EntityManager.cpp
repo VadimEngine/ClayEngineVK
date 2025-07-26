@@ -15,6 +15,7 @@ Entity EntityManager::createEntity() {
         id = mFreeEntities.back();
         mFreeEntities.pop_back();
     } else {
+        // TODO static cast
         id = mCurrentEntities_.size();
     }
 
@@ -59,7 +60,7 @@ void EntityManager::addSpriteRenderable(Entity e, const SpriteRenderable& comp) 
     mSignatures[e].set(ComponentType::SPRITE);
 }
 
-void EntityManager::render(VkCommandBuffer cmdBuffer) {
+void EntityManager::render(vk::CommandBuffer cmdBuffer) {
     mRenderSystem_.render(*this, cmdBuffer);
 }
 

@@ -5,6 +5,8 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+// clay
+#include "clay/utils/common/Logger.h"
 // class
 #include "clay/graphics/common/Mesh.h"
 
@@ -16,7 +18,8 @@ Mesh processMesh(BaseGraphicsContext& gContext, aiMesh* mesh, const aiScene* sce
 
     for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
         Mesh::Vertex vertex;
-        glm::vec3 vector; // we declare a placeholder vector since assimp uses its own vector class that doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
+        // we declare a placeholder vector since assimp uses its own vector class that doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
+        glm::vec3 vector;
         // positions
         vector.x = mesh->mVertices[i].x;
         vector.y = mesh->mVertices[i].y;
@@ -88,41 +91,40 @@ void processNode(BaseGraphicsContext& gContext, aiNode* node, const aiScene* sce
     }
 }
 
-VkVertexInputBindingDescription Mesh::Vertex::getBindingDescription() {
-    VkVertexInputBindingDescription bindingDescription{};
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(Mesh::Vertex);
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    return bindingDescription;
+vk::VertexInputBindingDescription Mesh::Vertex::getBindingDescription() {
+   return {
+        .binding = 0,
+        .stride = sizeof(Mesh::Vertex),
+        .inputRate = vk::VertexInputRate::eVertex
+    };
 }
 
-std::array<VkVertexInputAttributeDescription, 5> Mesh::Vertex::getAttributeDescriptions() {
-    std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions{};
+std::array<vk::VertexInputAttributeDescription, 5> Mesh::Vertex::getAttributeDescriptions() {
+    std::array<vk::VertexInputAttributeDescription, 5> attributeDescriptions{};
 
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[0].format = vk::Format::eR32G32B32Sfloat;
     attributeDescriptions[0].offset = offsetof(Mesh::Vertex, position);
 
     attributeDescriptions[1].binding = 0;
     attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[1].format = vk::Format::eR32G32B32Sfloat;
     attributeDescriptions[1].offset = offsetof(Mesh::Vertex, normal);
 
     attributeDescriptions[2].binding = 0;
     attributeDescriptions[2].location = 2;
-    attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[2].format = vk::Format::eR32G32B32Sfloat;
     attributeDescriptions[2].offset = offsetof(Mesh::Vertex, texCoord);
 
     attributeDescriptions[3].binding = 0;
     attributeDescriptions[3].location = 3;
-    attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[3].format = vk::Format::eR32G32B32Sfloat;
     attributeDescriptions[3].offset = offsetof(Mesh::Vertex, tangent);
 
     attributeDescriptions[4].binding = 0;
     attributeDescriptions[4].location = 4;
-    attributeDescriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[4].format = vk::Format::eR32G32B32Sfloat;
     attributeDescriptions[4].offset = offsetof(Mesh::Vertex, bitangent);
 
     return attributeDescriptions;
@@ -137,7 +139,7 @@ void Mesh::parseObjFile(BaseGraphicsContext& gContext, utils::FileData& fileData
         "obj" // Pass a file extension if needed, e.g., "obj"
     );
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-        //LOG_E("ERROR::ASSIMP::%s", import.GetErrorString());
+        LOG_E("ERROR::ASSIMP::%s", import.GetErrorString());
         return;
     }
     // Process the Assimp node and add to mMeshes_
@@ -164,10 +166,10 @@ Mesh::Mesh(Mesh&& other) noexcept
     mIndicesCount_ = other.mIndicesCount_;
 
     // Null out other's handles
-    other.mVertexBuffer_ = VK_NULL_HANDLE;
-    other.mVertexBufferMemory_ = VK_NULL_HANDLE;
-    other.mIndexBuffer_ = VK_NULL_HANDLE;
-    other.mIndexBufferMemory_ = VK_NULL_HANDLE;
+    other.mVertexBuffer_ = nullptr;
+    other.mVertexBufferMemory_ = nullptr;
+    other.mIndexBuffer_ = nullptr;
+    other.mIndexBufferMemory_ = nullptr;
 }
 
 // move assignment
@@ -179,11 +181,10 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept {
         mIndexBuffer_ = other.mIndexBuffer_;
         mIndexBufferMemory_ = other.mIndexBufferMemory_;
 
-
-        other.mVertexBuffer_ = VK_NULL_HANDLE;
-        other.mVertexBufferMemory_ = VK_NULL_HANDLE;
-        other.mIndexBuffer_ = VK_NULL_HANDLE;
-        other.mIndexBufferMemory_ = VK_NULL_HANDLE;
+        other.mVertexBuffer_ = nullptr;
+        other.mVertexBufferMemory_ = nullptr;
+        other.mIndexBuffer_ = nullptr;
+        other.mIndexBufferMemory_ = nullptr;
     }
     return *this;
 }
@@ -192,81 +193,79 @@ Mesh::~Mesh() {
     finalize();
 }
 
-void Mesh::bindMesh(VkCommandBuffer cmdBuffer) {
-    VkBuffer vertexBuffers[] = {mVertexBuffer_};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(cmdBuffer, mIndexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+void Mesh::bindMesh(vk::CommandBuffer cmdBuffer) {
+    vk::Buffer vertexBuffers[] = {mVertexBuffer_};
+    vk::DeviceSize offsets[] = {0};
+    cmdBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+    cmdBuffer.bindIndexBuffer(mIndexBuffer_, 0, vk::IndexType::eUint32);
 }
 
 void Mesh::createVertexBuffer(const std::vector<Vertex>& vertices) {
-    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+    vk::DeviceSize bufferSize = sizeof(Vertex) * vertices.size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    vk::Buffer stagingBuffer;
+    vk::DeviceMemory stagingBufferMemory;
     mGraphicsContext_.createBuffer(
         bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
         stagingBuffer,
         stagingBufferMemory
     );
 
-    void* data;
-    vkMapMemory(mGraphicsContext_.getDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    void* data = mGraphicsContext_.getDevice().mapMemory(stagingBufferMemory, 0, bufferSize);
     memcpy(data, vertices.data(), (size_t) bufferSize);
-    vkUnmapMemory(mGraphicsContext_.getDevice(), stagingBufferMemory);
+    mGraphicsContext_.getDevice().unmapMemory(stagingBufferMemory);
 
     mGraphicsContext_.createBuffer(
         bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
         mVertexBuffer_,
         mVertexBufferMemory_
     );
 
     mGraphicsContext_.copyBuffer(stagingBuffer, mVertexBuffer_, bufferSize);
-
-    vkDestroyBuffer(mGraphicsContext_.getDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(mGraphicsContext_.getDevice(), stagingBufferMemory, nullptr);
+    mGraphicsContext_.getDevice().destroyBuffer(stagingBuffer);
+    mGraphicsContext_.getDevice().freeMemory(stagingBufferMemory);
 }
 
 void Mesh::createIndexBuffer(const std::vector<unsigned int>& indices) {
     mIndicesCount_ = static_cast<uint32_t>(indices.size());
-    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    vk::Buffer stagingBuffer;
+    vk::DeviceMemory stagingBufferMemory;
     mGraphicsContext_.createBuffer(
         bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
         stagingBuffer,
         stagingBufferMemory
     );
 
-    void* data;
-    vkMapMemory(mGraphicsContext_.getDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    void* data = mGraphicsContext_.getDevice().mapMemory(stagingBufferMemory, 0, bufferSize);
     memcpy(data, indices.data(), (size_t) bufferSize);
-    vkUnmapMemory(mGraphicsContext_.getDevice(), stagingBufferMemory);
-    // use VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+    mGraphicsContext_.getDevice().unmapMemory(stagingBufferMemory);
     mGraphicsContext_.createBuffer(
         bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, 
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
         mIndexBuffer_,
         mIndexBufferMemory_
     );
 
     mGraphicsContext_.copyBuffer(stagingBuffer, mIndexBuffer_, bufferSize);
 
-    vkDestroyBuffer(mGraphicsContext_.getDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(mGraphicsContext_.getDevice(), stagingBufferMemory, nullptr);
+    mGraphicsContext_.getDevice().destroyBuffer(stagingBuffer);
+    mGraphicsContext_.getDevice().freeMemory(stagingBufferMemory);
 }
 
-VkBuffer Mesh::getVertexBuffer() const {
+vk::Buffer Mesh::getVertexBuffer() const {
     return mVertexBuffer_;
 }
 
-VkBuffer Mesh::getIndexBuffer() const {
+vk::Buffer Mesh::getIndexBuffer() const {
     return mIndexBuffer_;
 }
 
@@ -275,22 +274,22 @@ uint32_t Mesh::getIndicesCount() const {
 }
 
 void Mesh::finalize() {
-    if (mVertexBuffer_ != VK_NULL_HANDLE) {
-        vkDestroyBuffer(mGraphicsContext_.getDevice(), mVertexBuffer_, nullptr);
-        mVertexBuffer_ = VK_NULL_HANDLE;
+    if (mVertexBuffer_ != nullptr) {
+        mGraphicsContext_.getDevice().destroyBuffer(mVertexBuffer_);
+        mVertexBuffer_ = nullptr;
     }
-    if (mVertexBufferMemory_ != VK_NULL_HANDLE) {
-        vkFreeMemory(mGraphicsContext_.getDevice(), mVertexBufferMemory_, nullptr);
-        mVertexBufferMemory_ = VK_NULL_HANDLE;
+    if (mVertexBufferMemory_ != nullptr) {
+        mGraphicsContext_.getDevice().freeMemory(mVertexBufferMemory_);
+        mVertexBufferMemory_ = nullptr;
     }
 
-    if (mIndexBuffer_ != VK_NULL_HANDLE) {
-        vkDestroyBuffer(mGraphicsContext_.getDevice(), mIndexBuffer_, nullptr);
-        mIndexBuffer_ = VK_NULL_HANDLE;
+    if (mIndexBuffer_ != nullptr) {
+        mGraphicsContext_.getDevice().destroyBuffer(mIndexBuffer_);
+        mIndexBuffer_ = nullptr;
     }
-    if (mIndexBufferMemory_ != VK_NULL_HANDLE) {
-        vkFreeMemory(mGraphicsContext_.getDevice(), mIndexBufferMemory_, nullptr);
-        mIndexBufferMemory_ = VK_NULL_HANDLE;
+    if (mIndexBufferMemory_ != nullptr) {
+        mGraphicsContext_.getDevice().freeMemory(mIndexBufferMemory_);
+        mIndexBufferMemory_ = nullptr;
     }
     mIndicesCount_ = 0;
 }

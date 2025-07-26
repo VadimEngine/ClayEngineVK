@@ -8,16 +8,15 @@ namespace clay {
 Material::Material(const MaterialConfig& config)
     : mGraphicsContext_(config.graphicsContext),
       mPipelineResource_(config.pipelineResource),
-      mDescriptorSet_(VK_NULL_HANDLE) {
+      mDescriptorSet_(nullptr) {
     createDescriptorSet(config);
 }
 
-void Material::bindMaterial(VkCommandBuffer cmdBuffer) const {
-    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, getPipeline());
+void Material::bindMaterial(vk::CommandBuffer cmdBuffer) const {
+    cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, getPipeline());
 
-    vkCmdBindDescriptorSets(
-        cmdBuffer,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
+    cmdBuffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
         getPipelineLayout(),
         0,
         1,
@@ -27,8 +26,8 @@ void Material::bindMaterial(VkCommandBuffer cmdBuffer) const {
     );
 }
 
-void Material::pushConstants(VkCommandBuffer cmdBuffer, const void* data, uint32_t size, VkShaderStageFlags stageFlags) const {
-    vkCmdPushConstants(cmdBuffer, mPipelineResource_.getPipelineLayout(), stageFlags, 0, size, data);
+void Material::pushConstants(vk::CommandBuffer cmdBuffer, const void* data, uint32_t size, vk::ShaderStageFlags stageFlags) const {
+    cmdBuffer.pushConstants(mPipelineResource_.getPipelineLayout(), stageFlags, 0, size, data);
 }
 
 // move constructor
@@ -46,24 +45,23 @@ Material& Material::operator=(Material&& other) noexcept {
 }
 
 Material::~Material() {
-    // VkDescriptorSet does not need to be finalized manually. It is freed when the VkDescriptorPool is finalized
+    // vk::DescriptorSet does not need to be finalized manually. It is freed when the vk::DescriptorPool is finalized
 }
 
 void Material::createDescriptorSet(const MaterialConfig& config) {
     // Allocate descriptor set
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    vk::DescriptorSetAllocateInfo allocInfo{};
     allocInfo.descriptorPool = mGraphicsContext_.mDescriptorPool_;
     allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &mPipelineResource_.getDescriptorSetLayout();
-
-    if (vkAllocateDescriptorSets(mGraphicsContext_.getDevice(), &allocInfo, &mDescriptorSet_) != VK_SUCCESS) {
+    allocInfo.pSetLayouts = &((vk::DescriptorSetLayout&)mPipelineResource_.getDescriptorSetLayout());
+    
+    if (mGraphicsContext_.getDevice().allocateDescriptorSets(&allocInfo, &mDescriptorSet_) != vk::Result::eSuccess) {
         throw std::runtime_error("failed to allocate descriptor sets!");
     }
 
-    std::vector<VkWriteDescriptorSet> descriptorWrites;
-    std::vector<VkDescriptorBufferInfo> bufferInfos;
-    std::vector<VkDescriptorImageInfo> imageInfos;
+    std::vector<vk::WriteDescriptorSet> descriptorWrites;
+    std::vector<vk::DescriptorBufferInfo> bufferInfos;
+    std::vector<vk::DescriptorImageInfo> imageInfos;
 
     // Handle buffer bindings
     for (const auto& binding : config.bufferBindings) {
@@ -74,13 +72,12 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
         });
 
         descriptorWrites.push_back({
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet = mDescriptorSet_,
             .dstBinding = binding.binding,
             .dstArrayElement = 0,
             .descriptorCount = 1,
             .descriptorType = binding.descriptorType,
-            .pBufferInfo = &bufferInfos.back()
+            .pBufferInfo = &bufferInfos.back(),
         });
     }
 
@@ -89,11 +86,10 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
         imageInfos.push_back({
             .sampler = binding.sampler,
             .imageView = binding.imageView,
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         });
 
         descriptorWrites.push_back({
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet = mDescriptorSet_,
             .dstBinding = binding.binding,
             .dstArrayElement = 0,
@@ -108,13 +104,12 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
         imageInfos.push_back({
             .sampler = binding.sampler,
             .imageView = binding.imageView,
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         });
     }
 
     if (!config.imageArrayBindings.empty()) {
         descriptorWrites.push_back({
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet = mDescriptorSet_,
             .dstBinding = config.imageArrayBindings.front().binding,
             .dstArrayElement = 0,
@@ -124,8 +119,7 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
         });
     }
 
-    vkUpdateDescriptorSets(
-        mGraphicsContext_.getDevice(),
+    mGraphicsContext_.getDevice().updateDescriptorSets(
         static_cast<uint32_t>(descriptorWrites.size()),
         descriptorWrites.data(),
         0,
@@ -133,19 +127,19 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
     );
 }
 
-VkPipeline Material::getPipeline() const {
+vk::Pipeline Material::getPipeline() const {
     return mPipelineResource_.getPipeline();
 }
 
-VkPipelineLayout Material::getPipelineLayout() const {
+vk::PipelineLayout Material::getPipelineLayout() const {
     return mPipelineResource_.getPipelineLayout();
 }
 
-VkDescriptorSetLayout Material::getDescriptorSetLayout() const {
+vk::DescriptorSetLayout Material::getDescriptorSetLayout() const {
     return mPipelineResource_.getDescriptorSetLayout();
 }
 
-const VkDescriptorSet& Material::getDescriptorSet() const {
+const vk::DescriptorSet& Material::getDescriptorSet() const {
     return mDescriptorSet_;
 }
 

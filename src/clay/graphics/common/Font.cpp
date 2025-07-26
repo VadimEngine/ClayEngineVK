@@ -11,56 +11,58 @@
 
 namespace clay {
 
-VkVertexInputBindingDescription Font::FontVertex::getBindingDescription() {
-    VkVertexInputBindingDescription bindingDescription{};
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(FontVertex);
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    return bindingDescription;
+vk::VertexInputBindingDescription Font::FontVertex::getBindingDescription() {
+    return {
+        .binding = 0,
+        .stride = sizeof(FontVertex),
+        .inputRate = vk::VertexInputRate::eVertex,
+    };
 }
 
-std::array<VkVertexInputAttributeDescription, 2> Font::FontVertex::getAttributeDescriptions() {
-    std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
-    // vertex (vec4 -> 4 floats)
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(FontVertex, vertex);
+std::array<vk::VertexInputAttributeDescription, 2> Font::FontVertex::getAttributeDescriptions() {
+    std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions{};
+    // vertex (vec4)
+    attributeDescriptions[0] = {
+        .location = 0,
+        .binding = 0,
+        .format = vk::Format::eR32G32B32A32Sfloat,
+        .offset = offsetof(FontVertex, vertex)
+    };
 
     // glyphIndex (int)
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32_SINT;
-    attributeDescriptions[1].offset = offsetof(FontVertex, glyphIndex);
+    attributeDescriptions[1] = {
+       .location = 1,
+       .binding = 0,
+       .format = vk::Format::eR32Sint,
+       .offset = offsetof(FontVertex, glyphIndex)
+    };
 
     return attributeDescriptions;
 }
 
 // temp populate method TODO merge this into GraphicsContext
-void populateImage(VkImage image, const FT_Bitmap& bitmap, BaseGraphicsContext& mGContext_) {
+void populateImage(vk::Image image, const FT_Bitmap& bitmap, BaseGraphicsContext& mGContext_) {
     // Assuming bitmap.pixel_mode == FT_PIXEL_MODE_GRAY and bitmap.num_grays == 256
-    VkDeviceSize imageSize = bitmap.width * bitmap.rows; // 1 byte per pixel, single channel
+    vk::DeviceSize imageSize = bitmap.width * bitmap.rows; // 1 byte per pixel, single channel
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    vk::Buffer stagingBuffer;
+    vk::DeviceMemory stagingBufferMemory;
     mGContext_.createBuffer(
         imageSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
         stagingBuffer,
         stagingBufferMemory
     );
 
-    void* data;
-    vkMapMemory(mGContext_.getDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
+    void* data = mGContext_.getDevice().mapMemory(stagingBufferMemory, 0, imageSize);
     memcpy(data, bitmap.buffer, static_cast<size_t>(imageSize));
-    vkUnmapMemory(mGContext_.getDevice(), stagingBufferMemory);
-
+    mGContext_.getDevice().unmapMemory(stagingBufferMemory);
     mGContext_.transitionImageLayout(
         image,
-        VK_FORMAT_R8_UNORM,              // single channel 8-bit unsigned normalized
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        vk::Format::eR8Unorm,              // single channel 8-bit unsigned normalized
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eTransferDstOptimal,
         1
     );
 
@@ -73,22 +75,22 @@ void populateImage(VkImage image, const FT_Bitmap& bitmap, BaseGraphicsContext& 
 
     mGContext_.transitionImageLayout(
         image,
-        VK_FORMAT_R8_UNORM,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        vk::Format::eR8Unorm,
+        vk::ImageLayout::eTransferDstOptimal,
+        vk::ImageLayout::eShaderReadOnlyOptimal,
         1
     );
 
-    vkDestroyBuffer(mGContext_.getDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(mGContext_.getDevice(), stagingBufferMemory, nullptr);
+    mGContext_.getDevice().destroyBuffer(stagingBuffer);
+    mGContext_.getDevice().freeMemory(stagingBufferMemory);
 }
 
 Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer)
-    : mGContext_(gContext){
+    : mGContext_(gContext) {
 
-    mCharacterImage_.fill(VK_NULL_HANDLE);
-    mCharacterMemory_.fill(VK_NULL_HANDLE);
-    mCharacterImageView_.fill(VK_NULL_HANDLE);
+    mCharacterImage_.fill(nullptr);
+    mCharacterMemory_.fill(nullptr);
+    mCharacterImageView_.fill(nullptr);
 
     // Initialize the FreeType library
     FT_Library ft;
@@ -123,69 +125,61 @@ Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, ShaderM
         const FT_Bitmap& bitmap = face->glyph->bitmap;
 
         mCharacterFrontInfo_[c] = {
-            bitmap.width,
-            bitmap.rows,
-            face->glyph->bitmap_left,
-            face->glyph->bitmap_top,
-            static_cast<uint32_t>(face->glyph->advance.x)
+            .width = bitmap.width,
+            .height = bitmap.rows,
+            .bitmapLeft = face->glyph->bitmap_left,
+            .bitmapTop = face->glyph->bitmap_top,
+            .advance = static_cast<uint32_t>(face->glyph->advance.x)
         };
 
         if (bitmap.width == 0 || bitmap.rows == 0) {
             continue; // Skip glyphs with no visible bitmap
         }
 
-        // 1. Create VkImage for this glyph
-        VkImageCreateInfo imageInfo{};
-        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.format = VK_FORMAT_R8_UNORM;  // 1 channel 8-bit grayscale
-        imageInfo.extent.width = bitmap.width;
-        imageInfo.extent.height = bitmap.rows;
-        imageInfo.extent.depth = 1;
-        imageInfo.mipLevels = 1;
-        imageInfo.arrayLayers = 1;
-        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        // 1. Create vk::Image for this glyph
+        vk::ImageCreateInfo imageInfo{
+            .imageType = vk::ImageType::e2D,
+            .format = vk::Format::eR8Unorm,  // 1 channel 8-bit grayscale
+            .extent = vk::Extent3D{ static_cast<uint32_t>(bitmap.width), static_cast<uint32_t>(bitmap.rows), 1},
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = vk::SampleCountFlagBits::e1,
+            .tiling = vk::ImageTiling::eOptimal,
+            .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+            .sharingMode = vk::SharingMode::eExclusive,
+            .initialLayout = vk::ImageLayout::eUndefined,
+        };
 
-        VkImage glyphImage;
-        if (vkCreateImage(mGContext_.getDevice(), &imageInfo, nullptr, &glyphImage) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create image!");
-        }
 
-        VkDeviceMemory imageMemory;
+        vk::Image glyphImage =mGContext_.getDevice().createImage(imageInfo);
 
         // 2. Allocate memory for the image, bind memory (you need to find memory type and allocate)
-        VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(mGContext_.getDevice(), glyphImage, &memRequirements);
+        vk::MemoryRequirements memRequirements = mGContext_.getDevice().getImageMemoryRequirements(glyphImage);
 
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = mGContext_.findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        vk::MemoryAllocateInfo allocInfo{
+            .allocationSize = memRequirements.size,
+            .memoryTypeIndex = mGContext_.findMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal)
+        };
 
-        if (vkAllocateMemory(mGContext_.getDevice(), &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate image memory!");
-        }
+        vk::DeviceMemory imageMemory = mGContext_.getDevice().allocateMemory(allocInfo);
 
-        vkBindImageMemory(mGContext_.getDevice(), glyphImage, imageMemory, 0);
+        mGContext_.getDevice().bindImageMemory(glyphImage, imageMemory, 0);
 
-        // 3. Create VkImageView for the image
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = glyphImage;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = VK_FORMAT_R8_UNORM;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.levelCount = 1;
-        viewInfo.subresourceRange.baseArrayLayer = 0;
-        viewInfo.subresourceRange.layerCount = 1;
+        // 3. Create vk::ImageView for the image
+        vk::ImageViewCreateInfo viewInfo{
+            .image = glyphImage,
+            .viewType = vk::ImageViewType::e2D,
+            .format = vk::Format::eR8Unorm,
+            .subresourceRange = {
+                .aspectMask =  vk::ImageAspectFlagBits::eColor,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            }
+        };
 
-        VkImageView glyphImageView;
-        vkCreateImageView(mGContext_.getDevice(), &viewInfo, nullptr, &glyphImageView);
+        vk::ImageView glyphImageView = mGContext_.getDevice().createImageView(viewInfo);
 
         populateImage(glyphImage, bitmap, mGContext_);
 
@@ -210,11 +204,11 @@ Font::Font(Font&& other)
     mPipeline_ = std::move(other.mPipeline_);
     mMaterial_ = std::move(other.mMaterial_);
 
-    other.mSampler_ = VK_NULL_HANDLE;
+    other.mSampler_ = nullptr;
     for (size_t i = 0; i < 128; ++i) {
-        other.mCharacterImageView_[i] = VK_NULL_HANDLE;
-        other.mCharacterImage_[i] = VK_NULL_HANDLE;
-        other.mCharacterMemory_[i] = VK_NULL_HANDLE;
+        other.mCharacterImageView_[i] = nullptr;
+        other.mCharacterImage_[i] = nullptr;
+        other.mCharacterMemory_[i] = nullptr;
     }
 }
 
@@ -230,11 +224,11 @@ Font& Font::operator=(Font&& other) noexcept {
         mPipeline_ = std::move(other.mPipeline_);
         mMaterial_ = std::move(other.mMaterial_);
 
-        other.mSampler_ = VK_NULL_HANDLE;
+        other.mSampler_ = nullptr;
         for (size_t i = 0; i < 128; ++i) {
-            other.mCharacterImageView_[i] = VK_NULL_HANDLE;
-            other.mCharacterImage_[i] = VK_NULL_HANDLE;
-            other.mCharacterMemory_[i] = VK_NULL_HANDLE;
+            other.mCharacterImageView_[i] = nullptr;
+            other.mCharacterImage_[i] = nullptr;
+            other.mCharacterMemory_[i] = nullptr;
         }
     }
     return *this;
@@ -242,22 +236,22 @@ Font& Font::operator=(Font&& other) noexcept {
 
 Font::~Font() {
     for (size_t i = 0; i < 128; ++i) {
-        if (mCharacterImageView_[i] != VK_NULL_HANDLE) {
-            vkDestroyImageView(mGContext_.getDevice(), mCharacterImageView_[i], nullptr);
-            mCharacterImageView_[i] = VK_NULL_HANDLE;
+        if (mCharacterImageView_[i] != nullptr) {
+            mGContext_.getDevice().destroyImageView(mCharacterImageView_[i]);
+            mCharacterImageView_[i] = nullptr;
         }
 
-        if (mCharacterImage_[i] != VK_NULL_HANDLE) {
-            vkDestroyImage(mGContext_.getDevice(), mCharacterImage_[i], nullptr);
-            mCharacterImage_[i] = VK_NULL_HANDLE;
+        if (mCharacterImage_[i] != nullptr) {
+            mGContext_.getDevice().destroyImage(mCharacterImage_[i]);
+            mCharacterImage_[i] = nullptr;
         }
 
-        if (mCharacterMemory_[i] != VK_NULL_HANDLE) {
-            vkFreeMemory(mGContext_.getDevice(), mCharacterMemory_[i], nullptr);
-            mCharacterMemory_[i] = VK_NULL_HANDLE;
+        if (mCharacterMemory_[i] != nullptr) {
+            mGContext_.getDevice().freeMemory(mCharacterMemory_[i]);
+            mCharacterMemory_[i] = nullptr;
         }
     }
-    vkDestroySampler(mGContext_.getDevice(), mSampler_, nullptr);
+    mGContext_.getDevice().destroySampler(mSampler_);
 }
 
 const PipelineResource& Font::getPipeline() const {
@@ -273,7 +267,6 @@ const Font::CharacterInfo& Font::getCharacterInfo(char c) const {
 }
 
 void Font::createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer) {
-
     clay::PipelineResource::PipelineConfig pipelineConfig{
         .graphicsContext = mGContext_
     };
@@ -287,50 +280,46 @@ void Font::createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, Un
     pipelineConfig.pipelineLayoutInfo.vertexInputBindingDescription = Font::FontVertex::getBindingDescription();
 
     pipelineConfig.pipelineLayoutInfo.depthStencilState = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
-        .depthBoundsTestEnable = VK_FALSE,
-        .stencilTestEnable = VK_FALSE,
+        .depthTestEnable = vk::True,
+        .depthWriteEnable = vk::True,
+        .depthCompareOp = vk::CompareOp::eLessOrEqual,
+        .depthBoundsTestEnable = vk::False,
+        .stencilTestEnable = vk::False
     };
 
     pipelineConfig.pipelineLayoutInfo.rasterizerState = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .depthClampEnable = VK_FALSE,
-        .rasterizerDiscardEnable = VK_FALSE,
-        .polygonMode = VK_POLYGON_MODE_FILL,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .depthBiasEnable = VK_FALSE,
-        .lineWidth = 1.0f,
+        .depthClampEnable = vk::False,
+        .rasterizerDiscardEnable = vk::False,
+        .polygonMode = vk::PolygonMode::eFill,
+        .cullMode = vk::CullModeFlagBits::eNone,
+        .frontFace = vk::FrontFace::eCounterClockwise,
+        .depthBiasEnable = vk::False,
+        .lineWidth = 1.0f
     };
 
     pipelineConfig.pipelineLayoutInfo.pushConstants = {
         {
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex |  vk::ShaderStageFlagBits::eFragment,
             .offset = 0,
             .size = sizeof(glm::mat4) + sizeof(glm::vec4)
         }
     };
-
     pipelineConfig.bindingLayoutInfo.bindings = {
         {
             .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex,
             .pImmutableSamplers = nullptr
         },
         {
             .binding = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
             .descriptorCount = 128,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr
         }
     };
-
 
     mPipeline_ = std::make_unique<PipelineResource>(pipelineConfig);
 
@@ -342,42 +331,40 @@ void Font::createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, Un
     matConfig.bufferBindings = {
         {
             .buffer = uniformBuffer.mBuffer_,
-            .size = uniformBuffer.getSize_(),
+            .size = uniformBuffer.getSize(),
             .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+            .descriptorType = vk::DescriptorType::eUniformBuffer
         }
     };
 
+    vk::SamplerCreateInfo samplerInfo{
+        .magFilter = vk::Filter::eNearest,
+        .minFilter = vk::Filter::eNearest,
+        .mipmapMode = vk::SamplerMipmapMode::eNearest,
+        .addressModeU = vk::SamplerAddressMode::eClampToBorder,
+        .addressModeV = vk::SamplerAddressMode::eClampToBorder,
+        .addressModeW = vk::SamplerAddressMode::eClampToBorder,
+        .mipLodBias = 0.0f,
+        .anisotropyEnable = vk::False,
+        .maxAnisotropy = 1.0f,
+        .compareEnable = vk::False,
+        .compareOp = vk::CompareOp::eAlways,
+        .minLod = 0.0f,
+        .maxLod = 0.0f,
+        .borderColor = vk::BorderColor::eFloatTransparentBlack,
+        .unnormalizedCoordinates = vk::False
+    };
 
-    VkSamplerCreateInfo samplerInfo{};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_NEAREST;
-    samplerInfo.minFilter = VK_FILTER_NEAREST;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 1;
-    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-    samplerInfo.mipLodBias = 0.0f;
 
-    if (vkCreateSampler(mGContext_.getDevice(), &samplerInfo, nullptr, &mSampler_) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create texture sampler!");
-    }
+    mSampler_ = mGContext_.getDevice().createSampler(samplerInfo);
 
     for (int i = 0; i < 128; ++i) {
         matConfig.imageArrayBindings.push_back(
             {
                 .sampler = mSampler_,
-                .imageView = mCharacterImageView_[i] != VK_NULL_HANDLE ? mCharacterImageView_[i] : mCharacterImageView_['a'], // TODO fix this
+                .imageView = mCharacterImageView_[i] != nullptr ? mCharacterImageView_[i] : mCharacterImageView_['a'], // TODO fix this
                 .binding = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler
             }
         );
     }

@@ -52,43 +52,46 @@ void TextRenderable::initialize(BaseGraphicsContext& gContext, const std::string
 }
 
 void TextRenderable::createVertexBuffer(BaseGraphicsContext& gContext) {
-    VkDeviceSize bufferSize = sizeof(mVertices_[0]) * mVertices_.size();
+    vk::DeviceSize bufferSize = sizeof(mVertices_[0]) * mVertices_.size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    vk::Buffer stagingBuffer;
+    vk::DeviceMemory stagingBufferMemory;
     gContext.createBuffer(
         bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
         stagingBuffer,
         stagingBufferMemory
     );
 
-    void* data;
-    vkMapMemory(gContext.getDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, mVertices_.data(), (size_t)bufferSize);
-    vkUnmapMemory(gContext.getDevice(), stagingBufferMemory);
+    void* data = gContext.getDevice().mapMemory(
+        stagingBufferMemory, 
+        0,
+        bufferSize
+    );
+    std::memcpy(data, mVertices_.data(), static_cast<size_t>(bufferSize));
+    gContext.getDevice().unmapMemory(stagingBufferMemory);
 
     gContext.createBuffer(
         bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer ,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
         mVertexBuffer_,
         mVertexBufferMemory_
     );
 
     gContext.copyBuffer(stagingBuffer, mVertexBuffer_, bufferSize);
 
-    vkDestroyBuffer(gContext.getDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(gContext.getDevice(), stagingBufferMemory, nullptr);
+    gContext.getDevice().destroyBuffer(stagingBuffer);
+    gContext.getDevice().freeMemory(stagingBufferMemory);
 }
 
 void TextRenderable::finalize(BaseGraphicsContext& gContext) {
-    vkDestroyBuffer(gContext.getDevice(), mVertexBuffer_, nullptr);
-    vkFreeMemory(gContext.getDevice(), mVertexBufferMemory_, nullptr);
+    gContext.getDevice().destroyBuffer(mVertexBuffer_);
+    gContext.getDevice().freeMemory(mVertexBufferMemory_);
 }
 
-void TextRenderable::render(VkCommandBuffer cmdBuffer, const glm::mat4& parentModelMat) {
+void TextRenderable::render(vk::CommandBuffer cmdBuffer, const glm::mat4& parentModelMat) {
     mpFont_->getMaterial().bindMaterial(cmdBuffer);
 
     struct PushConstants {
@@ -99,12 +102,13 @@ void TextRenderable::render(VkCommandBuffer cmdBuffer, const glm::mat4& parentMo
     push.color = mColor_;
     push.model = parentModelMat * getModelMatrix();
 
-    mpFont_->getMaterial().pushConstants(cmdBuffer, &push, sizeof(PushConstants),  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    mpFont_->getMaterial().pushConstants(cmdBuffer, &push, sizeof(PushConstants), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
+    
+    vk::Buffer vertexBuffers[] = { mVertexBuffer_ };
+    vk::DeviceSize offsets[] = { 0 };
 
-    VkBuffer vertexBuffers[] = { mVertexBuffer_ };
-    VkDeviceSize offsets[] = { 0 };
-    vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdDraw(cmdBuffer, static_cast<uint32_t>(mVertices_.size()), 1, 0, 0);
+    cmdBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+    cmdBuffer.draw(static_cast<uint32_t>(mVertices_.size()), 1, 0, 0);
 }
 
 glm::mat4 TextRenderable::getModelMatrix() {

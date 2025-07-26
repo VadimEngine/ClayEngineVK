@@ -14,13 +14,13 @@ public:
     
     static void beginRender();
 
-    static void endRender(VkCommandBuffer cmdBuffer);
+    static void endRender(vk::CommandBuffer cmdBuffer);
 
     static void finalize();
     
 private:
     static BaseGraphicsContext* mpGraphics_;
-    static VkDescriptorPool mImguiDescriptorPool_;
+    static vk::DescriptorPool mImguiDescriptorPool_;
 };
 
 } // namespace clay

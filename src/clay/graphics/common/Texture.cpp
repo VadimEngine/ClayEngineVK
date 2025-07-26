@@ -13,10 +13,10 @@ Texture::Texture(Texture&& other) noexcept
     mImageView_ = other.mImageView_;
     mSampler_ = other.mSampler_;
 
-    other.mImage_ = VK_NULL_HANDLE;
-    other.mImageMemory_ = VK_NULL_HANDLE;
-    other.mImageView_ = VK_NULL_HANDLE;
-    other.mSampler_ = VK_NULL_HANDLE;
+    other.mImage_ = nullptr;
+    other.mImageMemory_ = nullptr;
+    other.mImageView_ = nullptr;
+    other.mSampler_ = nullptr;
 }
 
 Texture& Texture::operator=(Texture&& other) noexcept {
@@ -26,10 +26,10 @@ Texture& Texture::operator=(Texture&& other) noexcept {
         mImageView_ = other.mImageView_;
         mSampler_ = other.mSampler_;
 
-        other.mImage_ = VK_NULL_HANDLE;
-        other.mImageMemory_ = VK_NULL_HANDLE;
-        other.mImageView_ = VK_NULL_HANDLE;
-        other.mSampler_ = VK_NULL_HANDLE;
+        other.mImage_ = nullptr;
+        other.mImageMemory_ = nullptr;
+        other.mImageView_ = nullptr;
+        other.mSampler_ = nullptr;
     }
     return *this;
 }
@@ -43,11 +43,11 @@ void Texture::initialize(utils::ImageData& imageData) {
         imageData.width,
         imageData.height,
         1,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vk::SampleCountFlagBits::e1,
+        vk::Format::eR8G8B8A8Srgb,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
         mImage_,
         mImageMemory_
     );
@@ -55,45 +55,45 @@ void Texture::initialize(utils::ImageData& imageData) {
     mGraphicsContext_.populateImage(mImage_, imageData);
 
     mImageView_ = mGraphicsContext_.createImageView(
-        mImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, 1
+        mImage_, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, 1
     );
-    // todo transition layout from VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL  to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+
     // maybe give Texture an API to transition?
     mGraphicsContext_.transitionImageLayout(
         mImage_,
-        VK_FORMAT_R8G8B8A8_SRGB,              // single channel 8-bit unsigned normalized
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        vk::Format::eR8G8B8A8Srgb,
+        vk::ImageLayout::eTransferDstOptimal,
+        vk::ImageLayout::eShaderReadOnlyOptimal,
         1
     );
 }
 
-void Texture::setSampler(VkSampler sampler) {
+void Texture::setSampler(vk::Sampler sampler) {
     mSampler_ = sampler;
 }
 
 void Texture::finalize() {
-    if (mImageView_ != VK_NULL_HANDLE) {
-        vkDestroyImageView(mGraphicsContext_.getDevice(), mImageView_, nullptr);
-        mImageView_ = VK_NULL_HANDLE;
+    if (mImageView_ != nullptr) {
+        mGraphicsContext_.getDevice().destroyImageView(mImageView_);
+        mImageView_ = nullptr;
     }
 
-    if (mImage_ != VK_NULL_HANDLE) {
-        vkDestroyImage(mGraphicsContext_.getDevice(), mImage_, nullptr);
-        mImage_ = VK_NULL_HANDLE;
+    if (mImage_ != nullptr) {
+        mGraphicsContext_.getDevice().destroyImage(mImage_);
+        mImage_ = nullptr;
     }
 
-    if (mImageMemory_ != VK_NULL_HANDLE) {
-        vkFreeMemory(mGraphicsContext_.getDevice(), mImageMemory_, nullptr);
-        mImageMemory_ = VK_NULL_HANDLE;
+    if (mImageMemory_ != nullptr) {
+        mGraphicsContext_.getDevice().freeMemory(mImageMemory_);
+        mImageMemory_ = nullptr;
     }
 }
 
-VkImageView Texture::getImageView() const {
+vk::ImageView Texture::getImageView() const {
     return mImageView_;
 }
 
-VkSampler Texture::getSampler() const {
+vk::Sampler Texture::getSampler() const {
     return mSampler_;
 }
 

@@ -8,7 +8,7 @@
 // third party
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 // clay
 #include <clay/application/desktop/InputHandlerDesktop.h>
 
@@ -32,7 +32,7 @@ public:
 
     bool isRunning() const;
 
-    VkSurfaceKHR createSurface(VkInstance& instance);
+    vk::SurfaceKHR createSurface(vk::Instance& instance);
 
     void pushEvent(WindowEvent evt);
 

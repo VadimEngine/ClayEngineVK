@@ -41,7 +41,7 @@ public:
     void addSpriteRenderable(Entity e, const SpriteRenderable& comp);
 
     // for now, have update/render in here?
-    void render(VkCommandBuffer cmdBuffer);
+    void render(vk::CommandBuffer cmdBuffer);
 
     void update(float dt);
 
