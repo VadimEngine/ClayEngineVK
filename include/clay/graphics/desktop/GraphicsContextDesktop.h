@@ -26,9 +26,9 @@ struct QueueFamilyIndices {
 };
 
 struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
+    vk::SurfaceCapabilitiesKHR capabilities;
+    std::vector<vk::SurfaceFormatKHR> formats;
+    std::vector<vk::PresentModeKHR> presentModes;
 };
 
 class GraphicsContextDesktop : public BaseGraphicsContext {
@@ -44,19 +44,19 @@ public:
 
     void setupDebugMessenger();
 
-    void setSurface(VkSurfaceKHR surface);
+    void setSurface(vk::SurfaceKHR surface);
 
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+    SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device);
 
-    bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+    bool checkDeviceExtensionSupport(vk::PhysicalDevice device);
 
-    bool isDeviceSuitable(VkPhysicalDevice device);
+    bool isDeviceSuitable(vk::PhysicalDevice device);
 
     void createLogicalDevice();
 
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+    QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device);
 
-    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+    void populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo);
 
     std::vector<const char*> getRequiredExtensions();
 
@@ -66,19 +66,19 @@ public:
 
     void createDescriptorPool();
 
-    VkSampleCountFlagBits getMaxUsableSampleCount();
+    vk::SampleCountFlagBits getMaxUsableSampleCount();
 
     void pickPhysicalDevice();
 
-    VkShaderModule createShaderModule(const utils::FileData& file);
+    vk::ShaderModule createShaderModule(const utils::FileData& file);
 
-    void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+    void generateMipmaps(vk::Image image, vk::Format imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 
     void createRenderPass();
 
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+    vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
 
-    VkFormat findDepthFormat();
+    vk::Format findDepthFormat();
 
     void createCommandPool();
 
@@ -86,11 +86,11 @@ public:
 
     void createFramebuffers();
 
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+    vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
 
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes, VkPresentModeKHR desiredMode);
+    vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes, vk::PresentModeKHR desiredMode);
 
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, Window& window);
+    vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, Window& window);
 
     void recreateSwapChain(Window& window);
 
@@ -110,32 +110,32 @@ public:
 
     void finalize();
 
-    VkSampleCountFlagBits getMSAASamples() const;
+    vk::SampleCountFlagBits getMSAASamples() const;
 
     void setVSync(bool enabled);
 
 public:
-    VkSurfaceKHR mSurface_;
-    VkDebugUtilsMessengerEXT mDebugMessenger_; // TODO debug might need to go in the app instead of graphics
+    vk::SurfaceKHR mSurface_;
+    vk::DebugUtilsMessengerEXT mDebugMessenger_; // TODO debug might need to go in the app instead of graphics
     uint32_t mCurrentFrame_ = 0;
-    VkSampleCountFlagBits mMSAASamples_ = VK_SAMPLE_COUNT_1_BIT;
-    VkQueue mPresentQueue_;
-    VkImage mColorImage_;
-    VkDeviceMemory mColorImageMemory_;
-    VkImageView mColorImageView_;
-    VkImage mDepthImage_;
-    VkDeviceMemory mDepthImageMemory_;
-    VkImageView mDepthImageView_;
-    VkSwapchainKHR mSwapChain_;
-    std::vector<VkImage> mSwapChainImages_;
-    VkExtent2D mSwapChainExtent_;
-    std::vector<VkCommandBuffer> mCommandBuffers_;
-    VkFormat mSwapChainImageFormat_;
-    std::vector<VkImageView> mSwapChainImageViews_;
-    std::vector<VkFramebuffer> mSwapChainFramebuffers_;
-    std::vector<VkSemaphore> mImageAvailableSemaphores_;
-    std::vector<VkSemaphore> mRenderFinishedSemaphores_;
-    std::vector<VkFence> mInFlightFences_;
+    vk::SampleCountFlagBits mMSAASamples_ = vk::SampleCountFlagBits::e1;
+    vk::Queue mPresentQueue_;
+    vk::Image mColorImage_;
+    vk::DeviceMemory mColorImageMemory_;
+    vk::ImageView mColorImageView_;
+    vk::Image mDepthImage_;
+    vk::DeviceMemory mDepthImageMemory_;
+    vk::ImageView mDepthImageView_;
+    vk::SwapchainKHR mSwapChain_;
+    std::vector<vk::Image> mSwapChainImages_;
+    vk::Extent2D mSwapChainExtent_;
+    std::vector<vk::CommandBuffer> mCommandBuffers_;
+    vk::Format mSwapChainImageFormat_;
+    std::vector<vk::ImageView> mSwapChainImageViews_;
+    std::vector<vk::Framebuffer> mSwapChainFramebuffers_;
+    std::vector<vk::Semaphore> mImageAvailableSemaphores_;
+    std::vector<vk::Semaphore> mRenderFinishedSemaphores_;
+    std::vector<vk::Fence> mInFlightFences_;
     std::unique_ptr<UniformBuffer> mCameraUniform_;
     std::unique_ptr<UniformBuffer> mCameraUniformHeadLocked_;
 

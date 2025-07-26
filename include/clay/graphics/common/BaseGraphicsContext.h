@@ -2,6 +2,7 @@
 // standard lib
 #include <cstring> // memcpy
 // third party
+#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan.h>
 #include "clay/utils/common/Utils.h"
 
@@ -10,74 +11,63 @@ namespace clay {
 class BaseGraphicsContext {
 public:
 
-    struct BufferCreateInfo {
-        VkBufferUsageFlagBits type;
-        size_t stride;
-        size_t size;
-        void* data;
-    };
-
-    struct ShaderCreateInfo {
-        VkShaderStageFlagBits type;
-        const unsigned char *sourceData;
-        size_t sourceSize;
-    };
-
     virtual ~BaseGraphicsContext();
 
     void createBuffer(
-        VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkBuffer& buffer, VkDeviceMemory& bufferMemory
+        vk::DeviceSize size, 
+        vk::BufferUsageFlags usage, 
+        vk::MemoryPropertyFlags properties,
+        vk::Buffer& buffer, 
+        vk::DeviceMemory& bufferMemory
     );
 
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
 
     void createImage(
         uint32_t width,
         uint32_t height,
         uint32_t mipLevels,
-        VkSampleCountFlagBits numSamples,
-        VkFormat format,
-        VkImageTiling tiling,
-        VkImageUsageFlags usage,
-        VkMemoryPropertyFlags properties,
-        VkImage& image,
-        VkDeviceMemory& imageMemory
+        vk::SampleCountFlagBits numSamples,
+        vk::Format format,
+        vk::ImageTiling tiling,
+        vk::ImageUsageFlags usage,
+        vk::MemoryPropertyFlags properties,
+        vk::Image& image,
+        vk::DeviceMemory& imageMemory
     );
 
-    void populateImage(VkImage image, utils::ImageData& imageData);
+    void populateImage(vk::Image image, utils::ImageData& imageData);
 
-    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
+    vk::ImageView createImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags, uint32_t mipLevels);
 
-    VkShaderModule createShader(const ShaderCreateInfo& shaderCI);
+    void transitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, uint32_t mipLevels);
 
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
+    void copyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height);
 
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+    uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
-    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+    vk::CommandBuffer beginSingleTimeCommands();
 
-    VkCommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands(vk::CommandBuffer commandBuffer);
 
-    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+    vk::Device getDevice() const;
 
-    VkDevice getDevice() const;
-
-    VkInstance getInstance() const;
+    vk::Instance getInstance() const;
 
     std::pair<int, int> getFrameDimensions() const;
 
 protected:
-    VkDevice mDevice_ = VK_NULL_HANDLE;
-    VkInstance mInstance_ = VK_NULL_HANDLE;
+    // initializer list instead
+    vk::Device mDevice_ = nullptr;
+    vk::Instance mInstance_ = nullptr;
 
     std::pair<int, int> mFrameDimensions_;
 public:
-    VkPhysicalDevice mPhysicalDevice_ = VK_NULL_HANDLE;
-    VkRenderPass mRenderPass_ = VK_NULL_HANDLE;
-    VkDescriptorPool mDescriptorPool_ = VK_NULL_HANDLE;
-    VkCommandPool mCommandPool_ = VK_NULL_HANDLE;
-    VkQueue mGraphicsQueue_ = VK_NULL_HANDLE;
+    vk::PhysicalDevice mPhysicalDevice_ = nullptr;
+    vk::RenderPass mRenderPass_ = nullptr;
+    vk::DescriptorPool mDescriptorPool_ = nullptr;
+    vk::CommandPool mCommandPool_ = nullptr;
+    vk::Queue mGraphicsQueue_ = nullptr;
 };
 
 } // namespace clay

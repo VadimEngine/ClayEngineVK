@@ -12,7 +12,7 @@ void SkyBox::update(glm::quat& cameraOrientation, float dt) {
     mModelMat_ = glm::mat4_cast(glm::conjugate(cameraOrientation));
 }
 
-void SkyBox::render(VkCommandBuffer cmdBuffer) {
+void SkyBox::render(vk::CommandBuffer cmdBuffer) {
     mMaterial_.bindMaterial(cmdBuffer);
     mMesh_.bindMesh(cmdBuffer);
 
@@ -27,11 +27,11 @@ void SkyBox::render(VkCommandBuffer cmdBuffer) {
     mMaterial_.pushConstants(
         cmdBuffer,
         &push,
-        sizeof(PushConstants),
-        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT
+        sizeof(glm::mat4),
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
     );
 
-    vkCmdDrawIndexed(cmdBuffer, mMesh_.getIndicesCount(), 1, 0, 0, 0);
+    cmdBuffer.drawIndexed(mMesh_.getIndicesCount(), 1, 0, 0, 0);
 }
 
 } // namespace clay

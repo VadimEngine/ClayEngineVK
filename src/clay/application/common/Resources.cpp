@@ -56,8 +56,8 @@ Resources::Handle<T> Resources::ResourcePool<T>::loadResource(const std::vector<
         Mesh::parseObjFile(mGraphicsContext_, loadedFile, loadedMeshes);
         // TODO confirm there is only 1 mesh here // TODO mesh clean up seems wrong. There is delete happening due to the std::vector<clay::Mesh> being passed?
         return add(std::move(loadedMeshes[0]), resourceName);
-    } else if constexpr(std::is_same_v<T, VkSampler>) {
-        throw std::runtime_error("Load not implemented for VkSampler");
+    } else if constexpr(std::is_same_v<T, vk::Sampler>) {
+        throw std::runtime_error("Load not implemented for vk::Sampler");
     } else if constexpr(std::is_same_v<T, Model>) {
         throw std::runtime_error("Load not implemented for Model");
     } else if constexpr(std::is_same_v<T, Texture>) {
@@ -146,8 +146,8 @@ template<typename T>
 Resources::Handle<T> Resources::loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName) {
     if constexpr (std::is_same_v<T, Mesh>) {
         return mMeshesPool_.loadResource(resourcePaths, resourceName);
-    } else if constexpr(std::is_same_v<T, VkSampler>) {
-        throw std::runtime_error("Load not implemented for VkSampler");
+    } else if constexpr(std::is_same_v<T, vk::Sampler>) {
+        throw std::runtime_error("Load not implemented for vk::Sampler");
     } else if constexpr(std::is_same_v<T, Model>) {
         throw std::runtime_error("Load not implemented for Model");
     } else if constexpr(std::is_same_v<T, Texture>) {
@@ -176,7 +176,7 @@ auto Resources::addResource(T&& resource, const std::string& resourceName) -> Ha
     else if constexpr (std::is_same_v<U, Model>)
         return mModelsPool_.add(std::forward<T>(resource), resourceName);
 
-    else if constexpr (std::is_same_v<U, VkSampler>)
+    else if constexpr (std::is_same_v<U, vk::Sampler>)
         return mSamplersPool_.add(std::forward<T>(resource), resourceName);
 
     else if constexpr (std::is_same_v<U, Texture>)
@@ -205,7 +205,7 @@ T& Resources::operator[](Handle<T> handle) {
         return mMeshesPool_[handle];
     } else if constexpr (std::is_same_v<T, Model>) {
         return mModelsPool_[handle];
-    } else if constexpr (std::is_same_v<T, VkSampler>) {
+    } else if constexpr (std::is_same_v<T, vk::Sampler>) {
         return mSamplersPool_[handle];
     } else if constexpr (std::is_same_v<T, Texture>) {
         return mTexturesPool_[handle];
@@ -226,7 +226,7 @@ Resources::Handle<T> Resources::getHandle(const std::string& resourceName) {
         return mMeshesPool_.getHandle(resourceName);
     } else if constexpr (std::is_same_v<T, Model>) {
         return mModelsPool_.getHandle(resourceName);
-    } else if constexpr (std::is_same_v<T, VkSampler>) {
+    } else if constexpr (std::is_same_v<T, vk::Sampler>) {
         return mSamplersPool_.getHandle(resourceName);
     } else if constexpr (std::is_same_v<T, Texture>) {
         return mTexturesPool_.getHandle(resourceName);
@@ -254,7 +254,7 @@ void Resources::release(Handle<T> handle) {
     //     if (it != mModels_.end()) {
     //         mModels_.erase(it);
     //     }
-    // } else if constexpr(std::is_same_v<T, VkSampler>) {
+    // } else if constexpr(std::is_same_v<T, vk::Sampler>) {
     //     auto it = mSamplers_.find(resourceName);
     //     if (it != mSamplers_.end()) {
     //         mSamplers_.erase(it);
@@ -307,7 +307,7 @@ void Resources::releaseAll() {
 // Explicitly instantiate templates for expected types
 INSTANTIATE_RESOURCE_POOL(Mesh)
 INSTANTIATE_RESOURCE_POOL(Model)
-INSTANTIATE_RESOURCE_POOL(VkSampler)
+INSTANTIATE_RESOURCE_POOL(vk::Sampler)
 INSTANTIATE_RESOURCE_POOL(Texture)
 INSTANTIATE_RESOURCE_POOL(PipelineResource)
 INSTANTIATE_RESOURCE_POOL(Material)

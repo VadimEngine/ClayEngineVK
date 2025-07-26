@@ -5,7 +5,7 @@ namespace clay {
 
 class UniformBuffer {
 public:
-    UniformBuffer(BaseGraphicsContext& graphicsContext, VkDeviceSize size, void* data);
+    UniformBuffer(BaseGraphicsContext& graphicsContext, vk::DeviceSize size, void* data);
 
     UniformBuffer(const UniformBuffer&) = delete;
     UniformBuffer& operator=(const UniformBuffer&) = delete;
@@ -18,17 +18,16 @@ public:
     // Move assignment
     UniformBuffer& operator=(UniformBuffer&& other) noexcept;
 
-
     void setData(void* data, size_t size);
 
     void finalize();
 
-    VkDeviceSize getSize_() const;
+    vk::DeviceSize getSize() const;
 
-    VkDeviceSize mSize_;
     BaseGraphicsContext& mGraphicsContext_;
-    VkBuffer mBuffer_;
-    VkDeviceMemory mBufferMemory_;
+    vk::DeviceSize mSize_;
+    vk::Buffer mBuffer_;
+    vk::DeviceMemory mBufferMemory_;
     void* mBufferMapped_;
 };
 

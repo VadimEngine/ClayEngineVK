@@ -30,27 +30,82 @@ set(ALSOFT_EXAMPLES OFF CACHE BOOL "Build example program")
 # OpenXR
 set(BUILD_TESTS OFF CACHE INTERNAL "Disable OpenXR tests" FORCE)
 set(BUILD_API_LAYERS ON CACHE INTERNAL "Enable OpenXR API layers" FORCE)
+# vulkan
+find_package(Vulkan REQUIRED) 
+# PhysX
+set(CMAKE_EXE_LINKER_FLAGS_CHECKED "" CACHE STRING "" FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_PROFILE "" CACHE STRING "" FORCE)
+set(PHYSX_BUILD_DEBUG TRUE CACHE BOOL "Force PhysX debug" FORCE)
+set(CMAKEMODULES_VERSION "1.27")
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/physx_bin CACHE PATH "" FORCE)
+set(PXSHARED_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+set(PHYSX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/PhysX/physx CACHE PATH "" FORCE)
+set(PXSHARED_PATH ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/PhysX/pxshared CACHE PATH "" FORCE)
+set(CMAKEMODULES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/PhysX/externals/cmakemodules CACHE PATH "" FORCE)
+set(PX_DISABLE_WARNINGS_AS_ERRORS TRUE CACHE BOOL "" FORCE)
+set(PX_GENERATE_STATIC_LIBRARIES TRUE CACHE BOOL "" FORCE)
+set(PHYSX_LIBTYPE STATIC CACHE STRING "Build PhysX as static library")
+set(PX_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
+set(PX_BUILDPUBLICSAMPLES FALSE CACHE BOOL "" FORCE)
+set(PX_BUILDSNIPPETS FALSE CACHE BOOL "" FORCE)
+# Output directories for PhysX build artifacts
+set(PX_OUTPUT_BIN_DIR ${CMAKE_BINARY_DIR}/physx/bin CACHE PATH "" FORCE)
+set(PX_OUTPUT_LIB_DIR ${CMAKE_BINARY_DIR}/physx/lib CACHE PATH "" FORCE)
+set(PX_OUTPUT_DLL_DIR ${CMAKE_BINARY_DIR}/physx/bin CACHE PATH "" FORCE)
+
+if(CLAY_PLATFORM_DESKTOP)
+    if (WIN32)
+        # Windows
+        add_compile_options("/Wv:18")
+        set(NV_USE_DEBUG_WINCRT ON CACHE BOOL "Use the debug version of the CRT")
+        set(TARGET_BUILD_PLATFORM "windows" CACHE STRING "Target platform for PhysX" FORCE)
+    elseif (UNIX)
+        # Unix
+        set(TARGET_BUILD_PLATFORM "linux" CACHE STRING "Target platform for PhysX" FORCE)
+    endif()
+elseif (CLAY_PLATFORM_Android)
+    set(TARGET_BUILD_PLATFORM "android" CACHE STRING "Target platform for PhysX" FORCE)
+    set(ANDROID_ABI "armeabi-v7a with NEON" CACHE STRING "Android ABI" FORCE)
+    set(ANDROID_PLATFORM android-21 CACHE STRING "Android API level" FORCE)
+    set(ANDROID_STL c++_static CACHE STRING "Android STL" FORCE)
+elseif (CLAY_PLATFORM_XR)
+    set(TARGET_BUILD_PLATFORM "android" CACHE STRING "Target platform for PhysX" FORCE)
+    set(ANDROID_ABI "armeabi-v7a with NEON" CACHE STRING "Android ABI" FORCE)
+    set(ANDROID_PLATFORM android-21 CACHE STRING "Android API level" FORCE)
+    set(ANDROID_STL c++_static CACHE STRING "Android STL" FORCE)
+endif()
 
 # Add third party directories
+# Assimp
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/assimp)
+# FreeType
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/freetype
     ${CMAKE_BINARY_DIR}/thirdparty/freetype
 )
+# libsndfile
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/libsndfile
     ${CMAKE_BINARY_DIR}/thirdparty/libsndfile
 )
+# OpenAL
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/openal-soft
     ${CMAKE_BINARY_DIR}/thirdparty/openal-soft
 )
+# Physx
+add_subdirectory(
+    ${PHYSX_ROOT_DIR}/compiler/public
+    ${CMAKE_BINARY_DIR}/thirdparty/PhysX
+)
+# OpenXR
 if(CLAY_PLATFORM_XR)
     add_subdirectory(
         ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/OpenXR-SDK-Source
         ${CMAKE_BINARY_DIR}/thirdparty/OpenXR-SDK-Source
     )
 endif()
+# GLFW
 if(CLAY_PLATFORM_DESKTOP)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glfw)
 endif()
@@ -91,6 +146,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/backends
+    ${PHYSX_ROOT_DIR}/include
+    ${PXSHARED_PATH}/include
 )
 
 if(CLAY_PLATFORM_XR OR CLAY_PLATFORM_ANDROID)
@@ -106,10 +163,15 @@ endif()
 
 # Define common libraries
 set(CLAY_COMMON_LIBS
-    freetype
-    sndfile
-    OpenAL
     assimp
+    freetype
+    OpenAL
+    PhysXExtensions
+    PhysX
+    PhysXPvdSDK
+    PhysXCommon
+    PhysXFoundation
+    sndfile
 )
 
 if(CLAY_PLATFORM_XR)
@@ -121,8 +183,7 @@ if(CLAY_PLATFORM_XR)
         jnigraphics
         openxr_loader
     )
-endif()
-if(CLAY_PLATFORM_ANDROID)
+elseif(CLAY_PLATFORM_ANDROID)
     set(CLAY_PLATFORM_LIBS
         android
         vulkan
@@ -130,8 +191,7 @@ if(CLAY_PLATFORM_ANDROID)
         native_app_glue
         jnigraphics
     )
-endif()
-if (CLAY_PLATFORM_DESKTOP) # todo elseif?
+elseif (CLAY_PLATFORM_DESKTOP)
     # Common desktop libraries
     list(APPEND CLAY_PLATFORM_LIBS
         glfw
@@ -152,11 +212,9 @@ if (CLAY_PLATFORM_DESKTOP) # todo elseif?
     endif()
 endif()
 
-# TODO confirm this for android
-find_package(Vulkan REQUIRED) 
-
 # Link platform-specific and common libraries
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CLAY_COMMON_LIBS} ${CLAY_PLATFORM_LIBS})
+target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)
 
 if(CLAY_PLATFORM_XR)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_XR)

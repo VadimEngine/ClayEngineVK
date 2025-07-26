@@ -12,7 +12,7 @@ public:
 
     RenderSystem(BaseGraphicsContext& gContext, Resources& resources);
 
-    void render(EntityManager& entityManager, VkCommandBuffer cmdBuffer);
+    void render(EntityManager& entityManager, vk::CommandBuffer cmdBuffer);
 
     BaseGraphicsContext& mGContext_;
     Resources& mResources_;

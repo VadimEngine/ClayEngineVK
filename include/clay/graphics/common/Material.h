@@ -12,26 +12,26 @@ namespace clay {
 class Material {
 public:
     struct BufferBindingInfo {
-        VkBuffer buffer;
-        VkDeviceSize size;
+        vk::Buffer buffer;
+        vk::DeviceSize size;
         uint32_t binding;
-        VkDescriptorType descriptorType;
+        vk::DescriptorType descriptorType;
     };
 
     struct ImageBindingInfo {
-        VkSampler sampler;
-        VkImageView imageView;
+        vk::Sampler sampler;
+        vk::ImageView imageView;
         uint32_t binding;
-        VkDescriptorType descriptorType;
+        vk::DescriptorType descriptorType;
     };
 
     // TODO this could be used to tell the material to make its own uniforms
     struct BufferCreateInfo {
-        VkBufferUsageFlags usage;
+        vk::BufferUsageFlags usage;
         size_t stride;
         size_t size;
-        VkShaderStageFlags stageFlags;
-        VkDescriptorType descriptorType;
+        vk::ShaderStageFlags stageFlags;
+        vk::DescriptorType descriptorType;
         uint32_t binding;
     };
 
@@ -55,24 +55,24 @@ public:
     ~Material();
 
     // TODO rename to bind (same for mesh)
-    void bindMaterial(VkCommandBuffer cmdBuffer) const;
+    void bindMaterial(vk::CommandBuffer cmdBuffer) const;
 
-    void pushConstants(VkCommandBuffer cmdBuffer, const void* data, uint32_t size, VkShaderStageFlags stageFlags) const;
+    void pushConstants(vk::CommandBuffer cmdBuffer, const void* data, uint32_t size, vk::ShaderStageFlags stageFlags) const;
 
-    VkPipeline getPipeline() const;
+    vk::Pipeline getPipeline() const;
 
-    VkPipelineLayout getPipelineLayout() const;
+    vk::PipelineLayout getPipelineLayout() const;
 
-    VkDescriptorSetLayout getDescriptorSetLayout() const;
+    vk::DescriptorSetLayout getDescriptorSetLayout() const;
 
-    const VkDescriptorSet& getDescriptorSet() const;
+    const vk::DescriptorSet& getDescriptorSet() const;
     
 private:
     void createDescriptorSet(const MaterialConfig& config);
 
     BaseGraphicsContext& mGraphicsContext_;
     PipelineResource& mPipelineResource_; // TODO i think this should be a handle?
-    VkDescriptorSet mDescriptorSet_;
+    vk::DescriptorSet mDescriptorSet_;
 
     std::vector<UniformBuffer> mUniformBuffers_;
 };

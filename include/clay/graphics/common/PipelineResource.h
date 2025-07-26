@@ -12,16 +12,16 @@ class PipelineResource {
 public:
 
     struct DescriptorSetLayoutInfo {
-        std::vector<VkDescriptorSetLayoutBinding> bindings;
+        std::vector<vk::DescriptorSetLayoutBinding> bindings;
     };
 
     struct PipelineLayoutInfo {
         std::vector<ShaderModule*> shaders;
-        VkVertexInputBindingDescription vertexInputBindingDescription;
-        std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
-        VkPipelineDepthStencilStateCreateInfo depthStencilState;
-        VkPipelineRasterizationStateCreateInfo rasterizerState;
-        std::vector<VkPushConstantRange> pushConstants;
+        vk::VertexInputBindingDescription vertexInputBindingDescription{};
+        std::vector<vk::VertexInputAttributeDescription> attributeDescriptions;
+        vk::PipelineDepthStencilStateCreateInfo depthStencilState{};
+        vk::PipelineRasterizationStateCreateInfo rasterizerState{};
+        std::vector<vk::PushConstantRange> pushConstants;
     };
 
     struct PipelineConfig {
@@ -40,11 +40,11 @@ public:
 
     ~PipelineResource();
 
-    const VkPipelineLayout& getPipelineLayout() const;
+    const vk::PipelineLayout& getPipelineLayout() const;
 
-    const VkPipeline& getPipeline() const;
+    const vk::Pipeline& getPipeline() const;
 
-    const VkDescriptorSetLayout& getDescriptorSetLayout() const;
+    const vk::DescriptorSetLayout& getDescriptorSetLayout() const;
 
 private:
     void createDescriptorSetLayout(const PipelineConfig& config);
@@ -54,9 +54,9 @@ private:
     void finalize();
 
     BaseGraphicsContext& mGraphicsContext_;
-    VkPipelineLayout mPipelineLayout_;
-    VkPipeline mPipeline_;
-    VkDescriptorSetLayout mDescriptorSetLayout_;
+    vk::PipelineLayout mPipelineLayout_;
+    vk::Pipeline mPipeline_;
+    vk::DescriptorSetLayout mDescriptorSetLayout_;
 };
 
 } // namespace clay
