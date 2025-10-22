@@ -226,8 +226,8 @@ void Mesh::createVertexBuffer(const std::vector<Vertex>& vertices) {
     );
 
     mGraphicsContext_.copyBuffer(stagingBuffer, mVertexBuffer_, bufferSize);
-    mGraphicsContext_.getDevice().destroyBuffer(stagingBuffer);
-    mGraphicsContext_.getDevice().freeMemory(stagingBufferMemory);
+    mGraphicsContext_.getDevice().destroyBuffer(stagingBuffer, nullptr);
+    mGraphicsContext_.getDevice().freeMemory(stagingBufferMemory, nullptr);
 }
 
 void Mesh::createIndexBuffer(const std::vector<unsigned int>& indices) {
@@ -257,8 +257,8 @@ void Mesh::createIndexBuffer(const std::vector<unsigned int>& indices) {
 
     mGraphicsContext_.copyBuffer(stagingBuffer, mIndexBuffer_, bufferSize);
 
-    mGraphicsContext_.getDevice().destroyBuffer(stagingBuffer);
-    mGraphicsContext_.getDevice().freeMemory(stagingBufferMemory);
+    mGraphicsContext_.getDevice().destroyBuffer(stagingBuffer, nullptr);
+    mGraphicsContext_.getDevice().freeMemory(stagingBufferMemory, nullptr);
 }
 
 vk::Buffer Mesh::getVertexBuffer() const {
@@ -274,21 +274,21 @@ uint32_t Mesh::getIndicesCount() const {
 }
 
 void Mesh::finalize() {
-    if (mVertexBuffer_ != nullptr) {
-        mGraphicsContext_.getDevice().destroyBuffer(mVertexBuffer_);
+    if (mVertexBuffer_) {
+        mGraphicsContext_.getDevice().destroyBuffer(mVertexBuffer_, nullptr);
         mVertexBuffer_ = nullptr;
     }
-    if (mVertexBufferMemory_ != nullptr) {
-        mGraphicsContext_.getDevice().freeMemory(mVertexBufferMemory_);
+    if (mVertexBufferMemory_) {
+        mGraphicsContext_.getDevice().freeMemory(mVertexBufferMemory_, nullptr);
         mVertexBufferMemory_ = nullptr;
     }
 
-    if (mIndexBuffer_ != nullptr) {
-        mGraphicsContext_.getDevice().destroyBuffer(mIndexBuffer_);
+    if (mIndexBuffer_) {
+        mGraphicsContext_.getDevice().destroyBuffer(mIndexBuffer_, nullptr);
         mIndexBuffer_ = nullptr;
     }
-    if (mIndexBufferMemory_ != nullptr) {
-        mGraphicsContext_.getDevice().freeMemory(mIndexBufferMemory_);
+    if (mIndexBufferMemory_) {
+        mGraphicsContext_.getDevice().freeMemory(mIndexBufferMemory_, nullptr);
         mIndexBufferMemory_ = nullptr;
     }
     mIndicesCount_ = 0;

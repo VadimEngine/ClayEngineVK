@@ -73,19 +73,19 @@ void Texture::setSampler(vk::Sampler sampler) {
 }
 
 void Texture::finalize() {
-    if (mImageView_ != nullptr) {
-        mGraphicsContext_.getDevice().destroyImageView(mImageView_);
-        mImageView_ = nullptr;
+    if (mImageView_) {
+        mGraphicsContext_.getDevice().destroyImageView(mImageView_, nullptr);
+        mImageView_ = vk::ImageView{};
     }
 
-    if (mImage_ != nullptr) {
-        mGraphicsContext_.getDevice().destroyImage(mImage_);
-        mImage_ = nullptr;
+    if (mImage_) {
+        mGraphicsContext_.getDevice().destroyImage(mImage_, nullptr);
+        mImage_ = vk::Image{};
     }
 
-    if (mImageMemory_ != nullptr) {
-        mGraphicsContext_.getDevice().freeMemory(mImageMemory_);
-        mImageMemory_ = nullptr;
+    if (mImageMemory_) {
+        mGraphicsContext_.getDevice().freeMemory(mImageMemory_, nullptr);
+        mImageMemory_ = vk::DeviceMemory{};
     }
 }
 

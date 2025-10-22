@@ -39,8 +39,8 @@ void BaseGraphicsContext::populateImage(vk::Image image, utils::ImageData& image
         static_cast<uint32_t>(imageData.height)
     );
 
-    mDevice_.destroyBuffer(stagingBuffer);
-    mDevice_.freeMemory(stagingBufferMemory);
+    mDevice_.destroyBuffer(stagingBuffer, nullptr);
+    mDevice_.freeMemory(stagingBufferMemory, nullptr);
 }
 
 vk::ImageView BaseGraphicsContext::createImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags, uint32_t mipLevels) {
@@ -120,7 +120,7 @@ void BaseGraphicsContext::transitionImageLayout(
     vk::PipelineStageFlags destinationStage;
     
     if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal) {
-        barrier.srcAccessMask = vk::AccessFlagBits::eNone; // 0 or vk::AccessFlags{}
+        barrier.srcAccessMask = vk::AccessFlagBits{};
         barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 
         sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
@@ -132,13 +132,13 @@ void BaseGraphicsContext::transitionImageLayout(
         sourceStage = vk::PipelineStageFlagBits::eTransfer;
         destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
     } else if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal) {
-        barrier.srcAccessMask = vk::AccessFlagBits::eNone ;//0;
+        barrier.srcAccessMask = vk::AccessFlagBits{};
         barrier.dstAccessMask = vk::AccessFlagBits:: eShaderRead;
 
         sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
         destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
     } else if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eColorAttachmentOptimal) {
-        barrier.srcAccessMask = vk::AccessFlagBits::eNone; //0;
+        barrier.srcAccessMask = vk::AccessFlagBits{};
         barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 
         sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;

@@ -63,7 +63,7 @@ if(CLAY_PLATFORM_DESKTOP)
         # Unix
         set(TARGET_BUILD_PLATFORM "linux" CACHE STRING "Target platform for PhysX" FORCE)
     endif()
-elseif (CLAY_PLATFORM_Android)
+elseif (CLAY_PLATFORM_ANDROID)
     set(TARGET_BUILD_PLATFORM "android" CACHE STRING "Target platform for PhysX" FORCE)
     set(ANDROID_ABI "armeabi-v7a with NEON" CACHE STRING "Android ABI" FORCE)
     set(ANDROID_PLATFORM android-21 CACHE STRING "Android API level" FORCE)
@@ -153,6 +153,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 if(CLAY_PLATFORM_XR OR CLAY_PLATFORM_ANDROID)
     target_include_directories(${PROJECT_NAME} PUBLIC
         ${ANDROID_NDK}/sources/android/native_app_glue
+        ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/Vulkan-Hpp
     )
 endif()
 if(CLAY_PLATFORM_DESKTOP)
@@ -215,6 +216,7 @@ endif()
 # Link platform-specific and common libraries
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CLAY_COMMON_LIBS} ${CLAY_PLATFORM_LIBS})
 target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)
+target_compile_definitions(${PROJECT_NAME} PUBLIC _DEBUG)
 
 if(CLAY_PLATFORM_XR)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_XR)

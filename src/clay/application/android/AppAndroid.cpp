@@ -40,7 +40,12 @@ void AppAndroid::update() {
 }
 
 void AppAndroid::render() {
-    vkWaitForFences(mpGraphicsContext_->getDevice(), 1, &((GraphicsContextAndroid*)mpGraphicsContext_.get())->mInFlightFences_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_], VK_TRUE, UINT64_MAX);
+    mpGraphicsContext_->getDevice().waitForFences(
+        1,
+        &((GraphicsContextAndroid*)mpGraphicsContext_.get())->mInFlightFences_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_],
+        VK_TRUE,
+        UINT64_MAX
+    );
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
@@ -59,7 +64,7 @@ void AppAndroid::render() {
 //        throw std::runtime_error("failed to acquire swap chain image!");
 //    }
 
-    vkResetFences(mpGraphicsContext_->getDevice(), 1, &((GraphicsContextAndroid*)mpGraphicsContext_.get())->mInFlightFences_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_]);
+    mpGraphicsContext_->getDevice().resetFences(1, &((GraphicsContextAndroid*)mpGraphicsContext_.get())->mInFlightFences_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_]);
 
     vkResetCommandBuffer(((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCommandBuffers_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_], /*VkCommandBufferResetFlagBits*/ 0);
     recordCommandBuffer(((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCommandBuffers_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_], imageIndex);
@@ -74,7 +79,12 @@ void AppAndroid::render() {
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCommandBuffers_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_];
+    submitInfo.pCommandBuffers =
+        reinterpret_cast<const VkCommandBuffer*>(
+            &((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCommandBuffers_[
+                ((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_
+            ]
+        );
 
     VkSemaphore signalSemaphores[] = {((GraphicsContextAndroid*)mpGraphicsContext_.get())->mRenderFinishedSemaphores_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_]};
     submitInfo.signalSemaphoreCount = 1;

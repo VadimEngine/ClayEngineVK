@@ -81,8 +81,8 @@ void populateImage(vk::Image image, const FT_Bitmap& bitmap, BaseGraphicsContext
         1
     );
 
-    mGContext_.getDevice().destroyBuffer(stagingBuffer);
-    mGContext_.getDevice().freeMemory(stagingBufferMemory);
+    mGContext_.getDevice().destroyBuffer(stagingBuffer, nullptr);
+    mGContext_.getDevice().freeMemory(stagingBufferMemory, nullptr);
 }
 
 Font::Font(BaseGraphicsContext& gContext, utils::FileData& fontFileData, ShaderModule& vertShader, ShaderModule& fragShader, UniformBuffer& uniformBuffer)
@@ -236,22 +236,22 @@ Font& Font::operator=(Font&& other) noexcept {
 
 Font::~Font() {
     for (size_t i = 0; i < 128; ++i) {
-        if (mCharacterImageView_[i] != nullptr) {
-            mGContext_.getDevice().destroyImageView(mCharacterImageView_[i]);
+        if (mCharacterImageView_[i]) {
+            mGContext_.getDevice().destroyImageView(mCharacterImageView_[i], nullptr);
             mCharacterImageView_[i] = nullptr;
         }
 
-        if (mCharacterImage_[i] != nullptr) {
-            mGContext_.getDevice().destroyImage(mCharacterImage_[i]);
+        if (mCharacterImage_[i]) {
+            mGContext_.getDevice().destroyImage(mCharacterImage_[i], nullptr);
             mCharacterImage_[i] = nullptr;
         }
 
-        if (mCharacterMemory_[i] != nullptr) {
-            mGContext_.getDevice().freeMemory(mCharacterMemory_[i]);
+        if (mCharacterMemory_[i]) {
+            mGContext_.getDevice().freeMemory(mCharacterMemory_[i], nullptr);
             mCharacterMemory_[i] = nullptr;
         }
     }
-    mGContext_.getDevice().destroySampler(mSampler_);
+    mGContext_.getDevice().destroySampler(mSampler_, nullptr);
 }
 
 const PipelineResource& Font::getPipeline() const {
@@ -280,20 +280,20 @@ void Font::createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, Un
     pipelineConfig.pipelineLayoutInfo.vertexInputBindingDescription = Font::FontVertex::getBindingDescription();
 
     pipelineConfig.pipelineLayoutInfo.depthStencilState = {
-        .depthTestEnable = vk::True,
-        .depthWriteEnable = vk::True,
+        .depthTestEnable = true,
+        .depthWriteEnable = true,
         .depthCompareOp = vk::CompareOp::eLessOrEqual,
-        .depthBoundsTestEnable = vk::False,
-        .stencilTestEnable = vk::False
+        .depthBoundsTestEnable = false,
+        .stencilTestEnable = false
     };
 
     pipelineConfig.pipelineLayoutInfo.rasterizerState = {
-        .depthClampEnable = vk::False,
-        .rasterizerDiscardEnable = vk::False,
+        .depthClampEnable = false,
+        .rasterizerDiscardEnable = false,
         .polygonMode = vk::PolygonMode::eFill,
         .cullMode = vk::CullModeFlagBits::eNone,
         .frontFace = vk::FrontFace::eCounterClockwise,
-        .depthBiasEnable = vk::False,
+        .depthBiasEnable = false,
         .lineWidth = 1.0f
     };
 
@@ -345,14 +345,14 @@ void Font::createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, Un
         .addressModeV = vk::SamplerAddressMode::eClampToBorder,
         .addressModeW = vk::SamplerAddressMode::eClampToBorder,
         .mipLodBias = 0.0f,
-        .anisotropyEnable = vk::False,
+        .anisotropyEnable = false,
         .maxAnisotropy = 1.0f,
-        .compareEnable = vk::False,
+        .compareEnable = false,
         .compareOp = vk::CompareOp::eAlways,
         .minLod = 0.0f,
         .maxLod = 0.0f,
         .borderColor = vk::BorderColor::eFloatTransparentBlack,
-        .unnormalizedCoordinates = vk::False
+        .unnormalizedCoordinates = false
     };
 
 
@@ -362,7 +362,7 @@ void Font::createPipeline(ShaderModule& vertShader, ShaderModule& fragShader, Un
         matConfig.imageArrayBindings.push_back(
             {
                 .sampler = mSampler_,
-                .imageView = mCharacterImageView_[i] != nullptr ? mCharacterImageView_[i] : mCharacterImageView_['a'], // TODO fix this
+                .imageView = mCharacterImageView_[i] ? mCharacterImageView_[i] : mCharacterImageView_['a'], // TODO fix this
                 .binding = 1,
                 .descriptorType = vk::DescriptorType::eCombinedImageSampler
             }

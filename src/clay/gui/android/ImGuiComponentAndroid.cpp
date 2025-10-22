@@ -60,7 +60,7 @@ void ImGuiComponentAndroid::initialize(android_app* app, BaseGraphicsContext* gr
     init_info.DescriptorPool = mImguiDescriptorPool_;
     init_info.MinImageCount = 2;
     init_info.ImageCount = 2;
-    init_info.MSAASamples = ((GraphicsContextAndroid*)mpGraphics_)->getMSAASamples();
+    init_info.MSAASamples = static_cast<VkSampleCountFlagBits>(((GraphicsContextAndroid*)mpGraphics_)->getMSAASamples());
     init_info.RenderPass = mpGraphics_->mRenderPass_;
 
     ImGui_ImplVulkan_Init(&init_info);
@@ -74,7 +74,7 @@ void ImGuiComponentAndroid::beginRender() {
     ImGui::NewFrame();
 }
 
-void ImGuiComponentAndroid::endRender(VkCommandBuffer cmdBuffer) {
+void ImGuiComponentAndroid::endRender(vk::CommandBuffer cmdBuffer) {
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuffer);
 }
