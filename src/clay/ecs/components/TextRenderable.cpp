@@ -82,13 +82,13 @@ void TextRenderable::createVertexBuffer(BaseGraphicsContext& gContext) {
 
     gContext.copyBuffer(stagingBuffer, mVertexBuffer_, bufferSize);
 
-    gContext.getDevice().destroyBuffer(stagingBuffer);
-    gContext.getDevice().freeMemory(stagingBufferMemory);
+    gContext.getDevice().destroyBuffer(stagingBuffer, nullptr);
+    gContext.getDevice().freeMemory(stagingBufferMemory, nullptr);
 }
 
 void TextRenderable::finalize(BaseGraphicsContext& gContext) {
-    gContext.getDevice().destroyBuffer(mVertexBuffer_);
-    gContext.getDevice().freeMemory(mVertexBufferMemory_);
+    gContext.getDevice().destroyBuffer(mVertexBuffer_, nullptr);
+    gContext.getDevice().freeMemory(mVertexBufferMemory_, nullptr);
 }
 
 void TextRenderable::render(vk::CommandBuffer cmdBuffer, const glm::mat4& parentModelMat) {
@@ -97,7 +97,7 @@ void TextRenderable::render(vk::CommandBuffer cmdBuffer, const glm::mat4& parent
     struct PushConstants {
         glm::mat4 model;
         glm::vec4 color;
-    } push;
+    } push{};
 
     push.color = mColor_;
     push.model = parentModelMat * getModelMatrix();

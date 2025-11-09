@@ -86,12 +86,12 @@ void UniformBuffer::finalize() {
         mGraphicsContext_.getDevice().unmapMemory(mBufferMemory_);
         mBufferMapped_ = nullptr;
     }
-    if (mBuffer_ != nullptr) {
-        mGraphicsContext_.getDevice().destroyBuffer(mBuffer_);
+    if (mBuffer_) {
+        mGraphicsContext_.getDevice().destroyBuffer(mBuffer_, nullptr);
         mBuffer_ = nullptr;
     }
-    if (mBufferMemory_ != nullptr) {
-        mGraphicsContext_.getDevice().freeMemory(mBufferMemory_);
+    if (mBufferMemory_) {
+        mGraphicsContext_.getDevice().freeMemory(mBufferMemory_, nullptr);
         mBufferMemory_ = nullptr;
     }
 }

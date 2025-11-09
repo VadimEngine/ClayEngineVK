@@ -75,7 +75,7 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
 
     vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
         .topology = vk::PrimitiveTopology::eTriangleList,
-        .primitiveRestartEnable = vk::False
+        .primitiveRestartEnable = false
     };
 
     vk::PipelineViewportStateCreateInfo viewportState{
@@ -85,11 +85,11 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
 
     vk::PipelineMultisampleStateCreateInfo multisampling{
         .rasterizationSamples = vk::SampleCountFlagBits::e1,
-        .sampleShadingEnable = vk::False,
+        .sampleShadingEnable = false,
     };
 
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{
-        .blendEnable = vk::True,
+        .blendEnable = true,
         .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
         .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
         .colorBlendOp = vk::BlendOp::eAdd,
@@ -100,7 +100,7 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
     };
 
     vk::PipelineColorBlendStateCreateInfo colorBlending{
-        .logicOpEnable = vk::False,
+        .logicOpEnable = false,
         .logicOp = vk::LogicOp::eCopy,
         .attachmentCount = 1,
         .pAttachments = &colorBlendAttachment,
@@ -157,16 +157,16 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
 }
 
 void PipelineResource::finalize() {
-    if (mPipeline_ != nullptr) {
-        mGraphicsContext_.getDevice().destroyPipeline(mPipeline_);
+    if (mPipeline_) {
+        mGraphicsContext_.getDevice().destroyPipeline(mPipeline_, nullptr);
         mPipeline_ = nullptr;
     }
-    if (mPipelineLayout_ != nullptr) {
-        mGraphicsContext_.getDevice().destroyPipelineLayout(mPipelineLayout_);
+    if (mPipelineLayout_) {
+        mGraphicsContext_.getDevice().destroyPipelineLayout(mPipelineLayout_, nullptr);
         mPipelineLayout_ = nullptr;
     }
-    if (mDescriptorSetLayout_ != nullptr) {
-        mGraphicsContext_.getDevice().destroyDescriptorSetLayout(mDescriptorSetLayout_);
+    if (mDescriptorSetLayout_) {
+        mGraphicsContext_.getDevice().destroyDescriptorSetLayout(mDescriptorSetLayout_, nullptr);
         mDescriptorSetLayout_ = nullptr;
     }
 }

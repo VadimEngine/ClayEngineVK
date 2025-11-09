@@ -537,9 +537,9 @@ void XRSystem::CreateSwapchains() {
             clay::GraphicsContextXR::ImageViewCreateInfo imageViewCI{};
             imageViewCI.image = mpGraphicsContext_->GetSwapchainImage(colorSwapchainInfo.swapchain, j);
             imageViewCI.type = clay::GraphicsContextXR::ImageViewCreateInfo::Type::RTV;
-            imageViewCI.view = VK_IMAGE_VIEW_TYPE_2D;
-            imageViewCI.format = (VkFormat) colorSwapchainInfo.swapchainFormat;
-            imageViewCI.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+            imageViewCI.view = vk::ImageViewType::e2D;
+            imageViewCI.format = (vk::Format) colorSwapchainInfo.swapchainFormat;
+            imageViewCI.aspect = vk::ImageAspectFlagBits::eColor;
             imageViewCI.baseMipLevel = 0;
             imageViewCI.levelCount = 1;
             imageViewCI.baseArrayLayer = 0;
@@ -550,9 +550,9 @@ void XRSystem::CreateSwapchains() {
             clay::GraphicsContextXR::ImageViewCreateInfo imageViewCI{};
             imageViewCI.image = mpGraphicsContext_->GetSwapchainImage(depthSwapchainInfo.swapchain, j);
             imageViewCI.type = clay::GraphicsContextXR::ImageViewCreateInfo::Type::DSV;
-            imageViewCI.view = VK_IMAGE_VIEW_TYPE_2D;
-            imageViewCI.format = (VkFormat) depthSwapchainInfo.swapchainFormat;
-            imageViewCI.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+            imageViewCI.view = vk::ImageViewType::e2D;
+            imageViewCI.format = (vk::Format) depthSwapchainInfo.swapchainFormat;
+            imageViewCI.aspect = vk::ImageAspectFlagBits::eDepth;
             imageViewCI.baseMipLevel = 0;
             imageViewCI.levelCount = 1;
             imageViewCI.baseArrayLayer = 0;

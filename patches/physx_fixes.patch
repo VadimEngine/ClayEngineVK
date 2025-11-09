@@ -1,0 +1,55 @@
+--- thirdparty/PhysX/physx/source/compiler/cmake/android/CMakeLists.txt 2025-07-24 21:42:13.482618600 -0700
++++ thirdparty/PhysX/physx/source/compiler/cmake/android/CMakeLists.txt	2025-07-24 21:49:08.140436700 -0700
+@@ -29,20 +29,20 @@
+ # If/when the solutions go standalone (say, samples and visual tests) - those CMakeLists will need to be fixed.
+ 
+ STRING(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWERCASE)
++# Comment out due to NDK Clang errors
++# SET(PHYSX_WARNING_DISABLES "-Wno-invalid-offsetof -Wno-maybe-uninitialized  -Wno-unused-variable -Wno-variadic-macros -Wno-array-bounds -Wno-strict-aliasing")
+ 
+-SET(PHYSX_WARNING_DISABLES "-Wno-invalid-offsetof -Wno-maybe-uninitialized  -Wno-unused-variable -Wno-variadic-macros -Wno-array-bounds -Wno-strict-aliasing")
+-
+-IF(${ANDROID_ABI} STREQUAL "armeabi-v7a")
+-	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections -funwind-tables -fomit-frame-pointer -funswitch-loops -finline-limit=300 -fno-strict-aliasing -fstack-protector ${PHYSX_WARNING_DISABLES}" CACHE INTERNAL "PhysX CXX")
+-ELSEIF(${ANDROID_ABI} STREQUAL "armeabi-v7a with NEON")
+-	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -funwind-tables -fomit-frame-pointer -funswitch-loops -finline-limit=300 -fno-strict-aliasing -fstack-protector ${PHYSX_WARNING_DISABLES}" CACHE INTERNAL "PhysX CXX")
+-ELSEIF(${ANDROID_ABI} STREQUAL "arm64-v8a")
+-	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections ${PHYSX_WARNING_DISABLES} " CACHE INTERNAL "PhysX CXX")
+-ELSEIF(${ANDROID_ABI} STREQUAL "x86")
+-	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections ${PHYSX_WARNING_DISABLES} -fpack-struct=8 -malign-double " CACHE INTERNAL "PhysX CXX")
+-ELSEIF(${ANDROID_ABI} STREQUAL "x86_64")
+-	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections ${PHYSX_WARNING_DISABLES} -mstackrealign -msse3 " CACHE INTERNAL "PhysX CXX")
+-ENDIF()
++# IF(${ANDROID_ABI} STREQUAL "armeabi-v7a")
++# 	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections -funwind-tables -fomit-frame-pointer -funswitch-loops -finline-limit=300 -fno-strict-aliasing -fstack-protector ${PHYSX_WARNING_DISABLES}" CACHE INTERNAL "PhysX CXX")
++# ELSEIF(${ANDROID_ABI} STREQUAL "armeabi-v7a with NEON")
++# 	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -funwind-tables -fomit-frame-pointer -funswitch-loops -finline-limit=300 -fno-strict-aliasing -fstack-protector ${PHYSX_WARNING_DISABLES}" CACHE INTERNAL "PhysX CXX")
++# ELSEIF(${ANDROID_ABI} STREQUAL "arm64-v8a")
++# 	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections ${PHYSX_WARNING_DISABLES} " CACHE INTERNAL "PhysX CXX")
++# ELSEIF(${ANDROID_ABI} STREQUAL "x86")
++# 	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections ${PHYSX_WARNING_DISABLES} -fpack-struct=8 -malign-double " CACHE INTERNAL "PhysX CXX")
++# ELSEIF(${ANDROID_ABI} STREQUAL "x86_64")
++# 	SET(PHYSX_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Wpedantic -std=c++11 -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections ${PHYSX_WARNING_DISABLES} -mstackrealign -msse3 " CACHE INTERNAL "PhysX CXX")
++# ENDIF()
+ 
+ # Build debug info for all configurations
+ SET(PHYSX_CXX_FLAGS_DEBUG "-O0 -g" CACHE INTERNAL "PhysX Debug CXX Flags")
+--- thirdparty/PhysX/physx/source/foundation/include/unix/neon/PsUnixNeonInlineAoS.h	2025-07-24 21:42:23.031951500 -0700
++++ thirdparty/PhysX/physx/source/foundation/include/unix/neon/PsUnixNeonInlineAoS.h	2025-07-24 21:49:26.346118600 -0700
+@@ -3577,9 +3577,14 @@
+ 		return vdupq_lane_f32(vget_low_f32(a), 1);
+ 	}
+ #else
+-	if(index < 2)
++	// Updated for NDK
++	if(index == 0)
+ 	{
+-		return vdupq_lane_f32(vget_low_f32(a), index);
++	return vdupq_lane_f32(vget_low_f32(a), 0);
++	}
++	else if (index == 1)
++	{
++	return vdupq_lane_f32(vget_low_f32(a), 1);
+ 	}
+ #endif
+ 	else if(index == 2)

@@ -186,13 +186,13 @@ bool AppXR::RenderLayer(XRSystem::RenderLayerInfo &renderLayerInfo) {
     mScenes_.front()->update(0);
     // draw imgui onto a different frame buffer
 
-    vkWaitForFences(mXRSystem_->mpGraphicsContext_->getDevice(), 1, &mXRSystem_->mpGraphicsContext_->fence, true, UINT64_MAX);
+    mXRSystem_->mpGraphicsContext_->getDevice().waitForFences(1, &mXRSystem_->mpGraphicsContext_->fence, true, UINT64_MAX);
 
-    if (vkResetFences(mXRSystem_->mpGraphicsContext_->getDevice(), 1, &mXRSystem_->mpGraphicsContext_->fence) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to reset fence");
-    }
+    mXRSystem_->mpGraphicsContext_->getDevice().resetFences(1, &mXRSystem_->mpGraphicsContext_->fence);
 
-    vkResetCommandBuffer(imguiCommandBuffer, VkCommandBufferResetFlagBits(0));
+    imguiCommandBuffer.reset({});
+
+    //vkResetCommandBuffer(imguiCommandBuffer, VkCommandBufferResetFlagBits(0));
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -220,10 +220,9 @@ bool AppXR::RenderLayer(XRSystem::RenderLayerInfo &renderLayerInfo) {
         throw std::runtime_error("failed to record command buffer!");
     }
 
-    VkPipelineStageFlags waitDstStageMask = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    vk::PipelineStageFlags waitDstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
-    VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    vk::SubmitInfo submitInfo;
     submitInfo.pNext = nullptr;
     submitInfo.waitSemaphoreCount = mXRSystem_->mpGraphicsContext_->acquireSemaphore ? 1 : 0;
     submitInfo.pWaitSemaphores = mXRSystem_->mpGraphicsContext_->acquireSemaphore ? &mXRSystem_->mpGraphicsContext_->acquireSemaphore : nullptr;
@@ -233,14 +232,14 @@ bool AppXR::RenderLayer(XRSystem::RenderLayerInfo &renderLayerInfo) {
     submitInfo.signalSemaphoreCount = mXRSystem_->mpGraphicsContext_->submitSemaphore ? 1 : 0;
     submitInfo.pSignalSemaphores = mXRSystem_->mpGraphicsContext_->submitSemaphore ? &mXRSystem_->mpGraphicsContext_->submitSemaphore : nullptr;
 
-    vkQueueSubmit(mXRSystem_->mpGraphicsContext_->mGraphicsQueue_, 1, &submitInfo, mXRSystem_->mpGraphicsContext_->fence);
-    vkWaitForFences(mXRSystem_->mpGraphicsContext_->getDevice(), 1, &mXRSystem_->mpGraphicsContext_->fence, true, UINT64_MAX);
+    mXRSystem_->mpGraphicsContext_->mGraphicsQueue_.submit(submitInfo, mXRSystem_->mpGraphicsContext_->fence);
+    mXRSystem_->mpGraphicsContext_->getDevice().waitForFences(1, &mXRSystem_->mpGraphicsContext_->fence, true, UINT64_MAX);
 
     mXRSystem_->mpGraphicsContext_->transitionImageLayout(
         imguiImage,
-        VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        vk::Format::eR8Unorm,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ImageLayout::eShaderReadOnlyOptimal,
         1
     );
     // imgui end
@@ -354,9 +353,9 @@ bool AppXR::RenderLayer(XRSystem::RenderLayerInfo &renderLayerInfo) {
     // transition imgui back
     mXRSystem_->mpGraphicsContext_->transitionImageLayout(
         imguiImage,
-        VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        vk::Format::eR8Unorm,
+        vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::ImageLayout::eColorAttachmentOptimal,
         1
     );
 
@@ -366,46 +365,46 @@ bool AppXR::RenderLayer(XRSystem::RenderLayerInfo &renderLayerInfo) {
 void AppXR::InitImguiRender() {
     // command buffer
 
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    vk::CommandBufferAllocateInfo allocInfo{};
     allocInfo.commandPool = mpGraphicsContext_->mCommandPool_;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.level = vk::CommandBufferLevel::ePrimary;
     allocInfo.commandBufferCount = 1;
 
-    if (vkAllocateCommandBuffers(mpGraphicsContext_->getDevice(), &allocInfo, &imguiCommandBuffer) != VK_SUCCESS) {
+    vk::Result result = mpGraphicsContext_->getDevice().allocateCommandBuffers(&allocInfo, &imguiCommandBuffer);
+    if (result != vk::Result::eSuccess) {
         throw std::runtime_error("failed to allocate command buffers!");
     }
 
     // create renderpass
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = VK_FORMAT_R8G8B8A8_SRGB;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    vk::AttachmentDescription colorAttachment{
+        .format = vk::Format::eR8G8B8A8Srgb,
+        .samples = vk::SampleCountFlagBits::e1,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+        .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+        .initialLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .finalLayout = vk::ImageLayout::eColorAttachmentOptimal,
+    };
 
-    VkAttachmentReference colorAttachmentRef{};
+    vk::AttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;  // Index in pAttachments array
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
 
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    vk::SubpassDescription subpass{};
+    subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
 
-    VkSubpassDependency dependency{};
+    vk::SubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dependency.srcAccessMask = {};
+    dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    vk::RenderPassCreateInfo renderPassInfo{};
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
@@ -413,33 +412,31 @@ void AppXR::InitImguiRender() {
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(mpGraphicsContext_->getDevice(), &renderPassInfo, nullptr, &mXRSystem_->mpGraphicsContext_->imguiRenderPass) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create render pass");
-    }
+    mXRSystem_->mpGraphicsContext_->imguiRenderPass = mpGraphicsContext_->getDevice().createRenderPass(renderPassInfo);
 
     mpGraphicsContext_->createImage(
         imguiWidth,
         imguiHeight,
         1,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vk::SampleCountFlagBits::e1,
+        vk::Format::eR8G8B8A8Srgb,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
         imguiImage,
         imguiImageMemory
     );
 
     mXRSystem_->mpGraphicsContext_->transitionImageLayout(
         imguiImage,
-        VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        vk::Format::eR8G8B8A8Srgb,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eColorAttachmentOptimal,
         1
     );
 
     imguiImageView = mpGraphicsContext_->createImageView(
-        imguiImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, 1
+        imguiImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, 1
     );
 
     VkImageView attachments[] = {

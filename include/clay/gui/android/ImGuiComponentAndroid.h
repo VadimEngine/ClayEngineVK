@@ -16,7 +16,7 @@ public:
 
     static void beginRender();
 
-    static void endRender(VkCommandBuffer cmdBuffer);
+    static void endRender(vk::CommandBuffer cmdBuffer);
 
     static void finalize();
 

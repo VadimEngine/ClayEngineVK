@@ -13,7 +13,7 @@ ShaderModule::ShaderModule(vk::Device device, vk::ShaderStageFlagBits stage, con
 }
 
 ShaderModule::~ShaderModule() {
-    mDevice_.destroyShaderModule(mShaderModule_);
+    mDevice_.destroyShaderModule(mShaderModule_, nullptr);
 }
 
 vk::ShaderModule ShaderModule::getShaderModule() const {
