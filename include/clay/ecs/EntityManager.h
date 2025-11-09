@@ -42,7 +42,6 @@ public:
 
     void addMetaData(Entity e, const EntityMetadata& comp);
 
-
     // for now, have update/render in here?
     void render(vk::CommandBuffer cmdBuffer);
 

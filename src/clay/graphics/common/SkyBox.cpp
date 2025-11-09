@@ -27,7 +27,7 @@ void SkyBox::render(vk::CommandBuffer cmdBuffer) {
     mMaterial_.pushConstants(
         cmdBuffer,
         &push,
-        sizeof(glm::mat4),
+        sizeof(PushConstants),
         vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
     );
 

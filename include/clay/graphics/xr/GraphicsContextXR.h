@@ -16,6 +16,14 @@ namespace clay {
 
 class GraphicsContextXR : public BaseGraphicsContext {
 public:
+
+    struct BufferCreateInfo {
+        VkBufferUsageFlagBits type;
+        size_t stride;
+        size_t size;
+        void* data;
+    };
+
     // Pipeline Helpers
     enum class SwapchainType : uint8_t {
         COLOR,
@@ -159,16 +167,16 @@ public:
     };
 
     struct ImageViewCreateInfo {
-        VkImage image;
+        vk::Image image;
         enum class Type : uint8_t {
             RTV, //  Render Target View
             DSV, // Depth Stencil View
             SRV, //  Shader Resource View
             UAV // Unordered Access View
         } type;
-        VkImageViewType view;
-        VkFormat format;
-        VkImageAspectFlagBits aspect;
+        vk::ImageViewType view;
+        vk::Format format;
+        vk::ImageAspectFlagBits aspect;
         uint32_t baseMipLevel;
         uint32_t levelCount;
         uint32_t baseArrayLayer;
@@ -278,7 +286,7 @@ public:
     void Draw(uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0,
               uint32_t firstInstance = 0);
 
-    VkImageView CreateImageView(const ImageViewCreateInfo& imageViewCI);
+    vk::ImageView CreateImageView(const ImageViewCreateInfo& imageViewCI);
 
     void DestroyImageView(VkImageView& imageView);
 
@@ -302,9 +310,9 @@ public:
 //private:
     uint32_t queueFamilyIndex = 0xFFFFFFFF;
     uint32_t queueIndex = 0xFFFFFFFF;
-    VkFence fence{};
+    vk::Fence fence{};
 
-    VkCommandBuffer cmdBuffer{};
+    vk::CommandBuffer cmdBuffer{};
 
     std::vector<const char*> activeInstanceLayers{};
     std::vector<const char*> activeInstanceExtensions{};
@@ -318,11 +326,11 @@ public:
     XrGraphicsBindingVulkanKHR graphicsBinding{};
 
     std::unordered_map <XrSwapchain, std::pair<SwapchainType,
-        std::vector < XrSwapchainImageVulkanKHR>>> swapchainImagesMap{};
+        std::vector <XrSwapchainImageVulkanKHR>>> swapchainImagesMap{};
 
     std::unordered_map <VkSwapchainKHR, VkSurfaceKHR> surfaces;
-    VkSemaphore acquireSemaphore{};
-    VkSemaphore submitSemaphore{};
+    vk::Semaphore acquireSemaphore{};
+    vk::Semaphore submitSemaphore{};
 
     std::unordered_map <VkImage, VkImageLayout> imageStates;
     std::unordered_map <VkImage, std::pair<VkDeviceMemory, ImageCreateInfo>> imageResources;
@@ -337,7 +345,7 @@ public:
 
     VkPipeline setPipeline = VK_NULL_HANDLE;
     std::unordered_map <VkCommandBuffer, std::vector<VkDescriptorSet>> cmdBufferDescriptorSets;
-    std::vector <std::tuple<VkWriteDescriptorSet, VkDescriptorBufferInfo, VkDescriptorImageInfo>> writeDescSets;
+    std::vector <std::tuple<vk::WriteDescriptorSet, vk::DescriptorBufferInfo, vk::DescriptorImageInfo>> writeDescSets;
 
     VkRenderPass imguiRenderPass = VK_NULL_HANDLE;
 

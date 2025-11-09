@@ -50,11 +50,11 @@ public:
 
     InputHandlerXR mInputHandler_;
     // imgui
-    VkCommandBuffer imguiCommandBuffer = VK_NULL_HANDLE;
-    VkImage imguiImage = VK_NULL_HANDLE;
-    VkDeviceMemory imguiImageMemory = VK_NULL_HANDLE;
-    VkImageView imguiImageView = VK_NULL_HANDLE;
-    VkFramebuffer imguiFrameBuffer = VK_NULL_HANDLE;
+    vk::CommandBuffer imguiCommandBuffer;
+    vk::Image imguiImage;
+    vk::DeviceMemory imguiImageMemory;
+    vk::ImageView imguiImageView;
+    VkFramebuffer imguiFrameBuffer;
 
     uint32_t imguiWidth = 4128;
     uint32_t imguiHeight = 2208;

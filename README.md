@@ -8,7 +8,7 @@ All the libraries submodules are included in `./thirdparty`:
 - assimp
     - Loading 3d models and converting them to renderable components 
 - freetype
-    - loading and rendering fonts and text
+    - Loading and rendering fonts and text
 - GLFW
     - Creating windows for desktop and receiving input, 
 - GLM
@@ -17,14 +17,18 @@ All the libraries submodules are included in `./thirdparty`:
     - Unit testing
 - imgui
     - Prototype GUI
+- libsndfile
+    - Converting audio files into audio data useable by OpenAL
 - OpenAL
     - Playing audio
-- sndfile
-    - Converting audio files into audio data useable by OpenAL
-- stb
-    - Loading/saving image files
 - OpenXR-SDK-Source
     - Support for XR platforms
+- PhysX
+    - Real-time physics simulation library 
+- stb
+    - Loading/saving image files
+- Vulkan-Hpp
+    - Vulkan hpp API binding
 
 # Load all submodules
 - `git submodule update --init --recursive`
