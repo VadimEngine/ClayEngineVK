@@ -59,14 +59,12 @@ vk::Result CreateDebugUtilsMessengerEXT(
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageType,
-    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    vk::DebugUtilsMessageTypeFlagsEXT messageType,
+    const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData) {
-
     std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
-
-    return vk::False;
+    return VK_FALSE;
 }
 
 GraphicsContextDesktop::GraphicsContextDesktop(Window& window)  
@@ -296,10 +294,10 @@ void GraphicsContextDesktop::setupDebugMessenger() {
 }
 
 void GraphicsContextDesktop::populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo) {
-    createInfo = {
+    createInfo = vk::DebugUtilsMessengerCreateInfoEXT{
         .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
         .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-        .pfnUserCallback = debugCallback,
+        .pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback),
         .pUserData = nullptr
     };
 }

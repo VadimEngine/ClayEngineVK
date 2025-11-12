@@ -62,6 +62,17 @@ if(CLAY_PLATFORM_DESKTOP)
     elseif (UNIX)
         # Unix
         set(TARGET_BUILD_PLATFORM "linux" CACHE STRING "Target platform for PhysX" FORCE)
+        add_compile_options(
+            -Wno-array-bounds
+            -Wno-error=cpp
+            -Wno-error=volatile
+            -Wno-error=class-memaccess
+            -Wno-error=deprecated-enum-enum-conversion
+            -Wno-error=nonnull
+            -Wno-error=restrict
+            -Wno-error=template-id-cdtor
+            -Wno-error=deprecated-enum-float-conversion
+        )
     endif()
 elseif (CLAY_PLATFORM_ANDROID)
     set(TARGET_BUILD_PLATFORM "android" CACHE STRING "Target platform for PhysX" FORCE)
@@ -216,13 +227,14 @@ endif()
 # Link platform-specific and common libraries
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CLAY_COMMON_LIBS} ${CLAY_PLATFORM_LIBS})
 target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)
-target_compile_definitions(${PROJECT_NAME} PUBLIC _DEBUG)
 
 if(CLAY_PLATFORM_XR)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_XR)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC _DEBUG)
 endif()
 if(CLAY_PLATFORM_ANDROID)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_ANDROID)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC _DEBUG)
 endif()
 if(CLAY_PLATFORM_DESKTOP)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_DESKTOP)
