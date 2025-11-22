@@ -1,6 +1,9 @@
 // clay
 #include "clay/ecs/EntityManager.h"
+#include <clay/utils/common/Logger.h>
+// class
 #include "clay/ecs/systems/RenderSystem.h"
+
 
 namespace clay::ecs {
 

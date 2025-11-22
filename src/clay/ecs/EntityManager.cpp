@@ -1,4 +1,6 @@
 #include "clay/ecs/EntityManager.h"
+#include <clay/utils/common/Logger.h>
+
 
 namespace clay::ecs {
 
@@ -8,7 +10,15 @@ namespace clay::ecs {
 EntityManager::EntityManager(BaseGraphicsContext& gContext, Resources& resources) 
     : mResources_(resources), mRenderSystem_(gContext, resources) {}
 
-EntityManager::~EntityManager() {}
+EntityManager::~EntityManager() {
+    for (Entity e : mCurrentEntities_) {
+        if (mSignatures[e].test(ComponentType::RIGID_BODY)) {
+            if (mRigidBodies[e].actor) {
+                mRigidBodies[e].actor->release();
+            }
+        }
+    }
+}
 
 Entity EntityManager::createEntity() {
     Entity id;
@@ -17,8 +27,7 @@ Entity EntityManager::createEntity() {
         id = mFreeEntities.back();
         mFreeEntities.pop_back();
     } else {
-        // TODO static cast
-        id = mCurrentEntities_.size();
+        id = static_cast<int>(mCurrentEntities_.size());
     }
 
     mCurrentEntities_.insert(id);
@@ -26,9 +35,16 @@ Entity EntityManager::createEntity() {
 }
 
 void EntityManager::destroyEntity(Entity entity) {
+    if (mSignatures[entity][ComponentType::RIGID_BODY]) {
+        if (mRigidBodies[entity].actor) {
+            mRigidBodies[entity].actor->release();
+            mRigidBodies[entity].actor = nullptr;
+        }
+    }
+
     mSignatures[entity].reset();
     mCurrentEntities_.erase(entity);
-    mFreeEntities.push_back(entity);  
+    mFreeEntities.push_back(entity);
 }
 
 void EntityManager::addModelRenderable(Entity e, const ModelRenderable& comp) {
@@ -53,8 +69,15 @@ void EntityManager::addCollider(Entity e, const Collider& comp) {
 }
 
 void EntityManager::addRigidBody(Entity e, const RigidBody& comp) {
+    if (mSignatures[e][ComponentType::RIGID_BODY]) {
+        if (mRigidBodies[e].actor) {
+            mRigidBodies[e].actor->release();
+        }
+    }
+
     mRigidBodies[e] = comp;
     mSignatures[e].set(ComponentType::RIGID_BODY);
+
 }
 
 void EntityManager::addSpriteRenderable(Entity e, const SpriteRenderable& comp) {
@@ -71,6 +94,8 @@ void EntityManager::render(vk::CommandBuffer cmdBuffer) {
     mRenderSystem_.render(*this, cmdBuffer);
 }
 
-void update(float dt);
+void EntityManager::update(float dt) {
+    mPhysicsSystem_.update(*this, dt);
+}
 
 } // namespace clay::ecs

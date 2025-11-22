@@ -7,9 +7,10 @@
 // third party
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <PxPhysicsAPI.h>
+
 // clay
 #include "clay/application/common/Resources.h"
-
 namespace clay::ecs {
 
 // Used to define the size of arrays later on
@@ -75,11 +76,13 @@ struct EntityMetadata {
 struct RigidBody {
     static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::RIGID_BODY);
 
-    glm::vec3 velocity = {0.0f, 0.0f, 0.0f};
-    float mMaxSpeed_ = 100.f;
-    float mass = 1.0f;
-    float gravityScale = 0.f;
-    bool attractive = false;
+    physx::PxRigidActor* actor;
+
+    // glm::vec3 velocity = {0.0f, 0.0f, 0.0f};
+    // float mMaxSpeed_ = 100.f;
+    // float mass = 1.0f;
+    // float gravityScale = 0.f;
+    // bool attractive = false;
     
 };
 

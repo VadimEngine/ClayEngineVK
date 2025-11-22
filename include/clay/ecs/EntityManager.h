@@ -14,6 +14,8 @@
 #include "clay/graphics/common/Model.h"
 #include "clay/ecs/components/TextRenderable.h"
 #include "clay/ecs/systems/RenderSystem.h"
+#include "clay/ecs/systems/PhysicsSystem.h"
+
 
 namespace clay::ecs {
 
@@ -50,6 +52,7 @@ public:
 //private:
     Resources& mResources_;
     RenderSystem mRenderSystem_;
+    PhysicsSystem mPhysicsSystem_;
 
     std::vector<Entity> mFreeEntities;
     std::set<Entity> mCurrentEntities_;
