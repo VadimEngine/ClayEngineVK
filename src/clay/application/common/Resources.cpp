@@ -4,7 +4,7 @@
 #define INSTANTIATE_RESOURCE_POOL(Type)                                         \
 template class Resources::ResourcePool<Type>;                                   \
                                                                                 \
-template Resources::Handle<Type>                                                \
+template clay::Handle<Type>                                                     \
     Resources::loadResource<Type>(                                              \
         const std::vector<std::string>& resourcePath,                           \
         const std::string& resourceName                                         \
@@ -14,14 +14,14 @@ template auto                                                                   
     Resources::addResource<Type>(                                               \
         Type&&,                                                                 \
         const std::string&                                                      \
-    ) -> Handle<std::remove_reference_t<Type>>;                                 \
+    ) -> clay::Handle<std::remove_reference_t<Type>>;                           \
                                                                                 \
-template Type& Resources::operator[](Handle<Type> handle);                      \
+template Type& Resources::operator[](clay::Handle<Type> handle);                \
                                                                                 \
-template Resources::Handle<Type>                                                \
+template clay::Handle<Type>                                                     \
     Resources::getHandle(const std::string& resourceName);                      \
                                                                                 \
-template void Resources::release<Type>(Handle<Type> handle);
+template void Resources::release<Type>(clay::Handle<Type> handle);
 
 
 namespace clay {
@@ -49,7 +49,7 @@ Resources::ResourcePool<T>::ResourcePool(BaseGraphicsContext& graphicsContext)
     : mGraphicsContext_(graphicsContext) {}
 
 template<typename T>
-Resources::Handle<T> Resources::ResourcePool<T>::loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName) {
+clay::Handle<T> Resources::ResourcePool<T>::loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName) {
     if constexpr (std::is_same_v<T, Mesh>) {
         utils::FileData loadedFile = loadFileToMemory(resourcePaths[0]);
         std::vector<clay::Mesh> loadedMeshes;
@@ -79,7 +79,7 @@ Resources::Handle<T> Resources::ResourcePool<T>::loadResource(const std::vector<
 }
 
 template<typename T>
-Resources::Handle<T> Resources::ResourcePool<T>::add(T&& obj, const std::string& name) {
+clay::Handle<T> Resources::ResourcePool<T>::add(T&& obj, const std::string& name) {
     uint32_t idx;
     if (!freeList.empty()) {
         idx = freeList.back();
@@ -108,6 +108,23 @@ void Resources::ResourcePool<T>::remove(Handle<T> handle) {
 }
 
 template<typename T>
+void Resources::ResourcePool<T>::clear() {
+    // For samplers, we need to manually destroy them before clearing
+    if constexpr (std::is_same_v<T, vk::Sampler>) {
+        for (auto& sampler : resources) {
+            if (sampler) {
+                mGraphicsContext_.getDevice().destroySampler(sampler, nullptr);
+            }
+        }
+    }
+    // Clear all resources - this calls destructors for Mesh, Texture, etc.
+    resources.clear();
+    generations.clear();
+    freeList.clear();
+    name2Handle.clear();
+}
+
+template<typename T>
 T& Resources::ResourcePool<T>::operator[](Handle<T> handle) {
     assert(handle.index < resources.size());
     assert(generations[handle.index] == handle.gen);
@@ -115,7 +132,7 @@ T& Resources::ResourcePool<T>::operator[](Handle<T> handle) {
 }
 
 template<typename T>
-Resources::Handle<T> Resources::ResourcePool<T>::getHandle(const std::string& name) const {
+clay::Handle<T> Resources::ResourcePool<T>::getHandle(const std::string& name) const {
     auto it = name2Handle.find(name);
     if (it == name2Handle.end()) {
         throw std::runtime_error("Unknown resource: " + name);
@@ -136,14 +153,17 @@ Resources::Resources(BaseGraphicsContext& graphicsContext) :
     mPipePool_(mGraphicsContext_),
     mMaterialsPool_(mGraphicsContext_),
     mAudiosPool_(mGraphicsContext_),
-    mFontsPool_(mGraphicsContext_) {};
+    mFontsPool_(mGraphicsContext_),
+    mAnimations2DPool_(mGraphicsContext_),
+    mAnimatedMeshesPool_(mGraphicsContext_),
+    mSkeletalAnimationsPool_(mGraphicsContext_) {};
 
 Resources::~Resources() {
     releaseAll();
 }
 
 template<typename T>
-Resources::Handle<T> Resources::loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName) {
+clay::Handle<T> Resources::loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName) {
     if constexpr (std::is_same_v<T, Mesh>) {
         return mMeshesPool_.loadResource(resourcePaths, resourceName);
     } else if constexpr(std::is_same_v<T, vk::Sampler>) {
@@ -158,11 +178,10 @@ Resources::Handle<T> Resources::loadResource(const std::vector<std::string>& res
         throw std::runtime_error("Load not implemented for Material");
     } else if constexpr (std::is_same_v<T, Audio>) {
         return mAudiosPool_.loadResource(resourcePaths, resourceName);
-    }
-    else if constexpr (std::is_same_v<T, Font>) {
+    } else if constexpr (std::is_same_v<T, Font>) {
         throw std::runtime_error("Load not implemented for Font");
     } else {
-        throw std::runtime_error("Load not implemented.");
+        throw std::runtime_error(std::string("Load not implemented for type: ") + typeid(T).name());
     }
 }
 
@@ -170,33 +189,31 @@ template<typename T>
 auto Resources::addResource(T&& resource, const std::string& resourceName) -> Handle<std::remove_reference_t<T>> {
     using U = std::remove_reference_t<T>;
 
-    if constexpr (std::is_same_v<U, Mesh>)
+    if constexpr (std::is_same_v<U, Mesh>) {
         return mMeshesPool_.add(std::forward<T>(resource), resourceName);
-
-    else if constexpr (std::is_same_v<U, Model>)
+    } else if constexpr (std::is_same_v<U, Model>) {
         return mModelsPool_.add(std::forward<T>(resource), resourceName);
-
-    else if constexpr (std::is_same_v<U, vk::Sampler>)
+    } else if constexpr (std::is_same_v<U, vk::Sampler>) {
         return mSamplersPool_.add(std::forward<T>(resource), resourceName);
-
-    else if constexpr (std::is_same_v<U, Texture>)
+    } else if constexpr (std::is_same_v<U, Texture>) {
         return mTexturesPool_.add(std::forward<T>(resource), resourceName);
-
-    else if constexpr (std::is_same_v<U, PipelineResource>)
+    } else if constexpr (std::is_same_v<U, PipelineResource>) {
         return mPipePool_.add(std::forward<T>(resource), resourceName);
-
-    else if constexpr (std::is_same_v<U, Material>)
+    } else if constexpr (std::is_same_v<U, Material>) {
         return mMaterialsPool_.add(std::forward<T>(resource), resourceName);
-
-    else if constexpr (std::is_same_v<U, Audio>)
+    } else if constexpr (std::is_same_v<U, Audio>) {
         return mAudiosPool_.add(std::forward<T>(resource), resourceName);
-
-    else if constexpr (std::is_same_v<U, Font>)
+    } else if constexpr (std::is_same_v<U, Font>) {
         return mFontsPool_.add(std::forward<T>(resource), resourceName);
-
-    else
-        static_assert(std::is_same_v<U, void>,
-                      "addResource: unsupported resource type");
+    } else if constexpr (std::is_same_v<U, Animation2D>) {
+        return mAnimations2DPool_.add(std::forward<T>(resource), resourceName);
+    } else if constexpr (std::is_same_v<U, AnimatedMesh>) {
+        return mAnimatedMeshesPool_.add(std::forward<T>(resource), resourceName);
+    } else if constexpr (std::is_same_v<U, SkeletalAnimation>) {
+        return mSkeletalAnimationsPool_.add(std::forward<T>(resource), resourceName);
+    } else {
+        throw std::runtime_error(std::string("addResource: unsupported resource type: ") + typeid(T).name());
+    }
 }
 
 template<typename T>
@@ -217,11 +234,19 @@ T& Resources::operator[](Handle<T> handle) {
         return mAudiosPool_[handle];
     } else if constexpr (std::is_same_v<T, Font>) {
         return mFontsPool_[handle];
+    } else if constexpr (std::is_same_v<T, Animation2D>) {
+        return mAnimations2DPool_[handle];
+    } else if constexpr (std::is_same_v<T, AnimatedMesh>) {
+        return mAnimatedMeshesPool_[handle];
+    } else if constexpr (std::is_same_v<T, SkeletalAnimation>) {
+        return mSkeletalAnimationsPool_[handle];
+    } else {
+        throw std::runtime_error(std::string("operator[]: unsupported resource type: ") + typeid(T).name());
     }
 }
 
 template<typename T>
-Resources::Handle<T> Resources::getHandle(const std::string& resourceName) {
+clay::Handle<T> Resources::getHandle(const std::string& resourceName) {
     if constexpr (std::is_same_v<T, Mesh>) {
         return mMeshesPool_.getHandle(resourceName);
     } else if constexpr (std::is_same_v<T, Model>) {
@@ -238,68 +263,59 @@ Resources::Handle<T> Resources::getHandle(const std::string& resourceName) {
         return mAudiosPool_.getHandle(resourceName);
     } else if constexpr (std::is_same_v<T, Font>) {
         return mFontsPool_.getHandle(resourceName);
+    } else if constexpr (std::is_same_v<T, Animation2D>) {
+        return mAnimations2DPool_.getHandle(resourceName);
+    } else if constexpr (std::is_same_v<T, AnimatedMesh>) {
+        return mAnimatedMeshesPool_.getHandle(resourceName);
+    } else if constexpr (std::is_same_v<T, SkeletalAnimation>) {
+        return mSkeletalAnimationsPool_.getHandle(resourceName);
+    } else {
+        throw std::runtime_error(std::string("getHandle: unsupported resource type: ") + typeid(T).name());
     }
 }
 
 template<typename T>
 void Resources::release(Handle<T> handle) {
-    // if constexpr (std::is_same_v<T, Mesh>) {
-    //     // auto it = mMeshes_.find(resourceName);
-    //     // if (it != mMeshes_.end()) {
-    //     //     mMeshes_.erase(it);
-    //     // }
-    //     mMeshesPool_.remove(handle);
-    // } else if constexpr (std::is_same_v<T, Model>) {
-    //     auto it = mModels_.find(resourceName);
-    //     if (it != mModels_.end()) {
-    //         mModels_.erase(it);
-    //     }
-    // } else if constexpr(std::is_same_v<T, vk::Sampler>) {
-    //     auto it = mSamplers_.find(resourceName);
-    //     if (it != mSamplers_.end()) {
-    //         mSamplers_.erase(it);
-    //     }
-    // } else if constexpr(std::is_same_v<T, Texture>) {
-    //     auto it = mTextures_.find(resourceName);
-    //     if (it != mTextures_.end()) {
-    //         mTextures_.erase(it);
-    //     }
-    // } else if constexpr(std::is_same_v<T, PipelineResource>) {
-    //     auto it = mPipelineResources_.find(resourceName);
-    //     if (it != mPipelineResources_.end()) {
-    //         mPipelineResources_.erase(it);
-    //     }
-    // } else if constexpr(std::is_same_v<T, Material>) {
-    //     auto it = mMaterials_.find(resourceName);
-    //     if (it != mMaterials_.end()) {
-    //         mMaterials_.erase(it);
-    //     }
-    // } else if constexpr (std::is_same_v<T, Audio>) {
-    //     auto it = mAudios_.find(resourceName);
-    //     if (it != mAudios_.end()) {
-    //         mAudios_.erase(it);
-    //     }
-    // }
-    // else if constexpr (std::is_same_v<T, Font>) {
-    //     auto it = mFonts_.find(resourceName);
-    //     if (it != mFonts_.end()) {
-    //         mFonts_.erase(it);
-    //     }
-    // }
+    if constexpr (std::is_same_v<T, Mesh>) {
+        mMeshesPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, Model>) {
+        mModelsPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, vk::Sampler>) {
+        mSamplersPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, Texture>) {
+        mTexturesPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, PipelineResource>) {
+        mPipePool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, Material>) {
+        mMaterialsPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, Audio>) {
+        mAudiosPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, Font>) {
+        mFontsPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, Animation2D>) {
+        mAnimations2DPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, AnimatedMesh>) {
+        mAnimatedMeshesPool_.remove(handle);
+    } else if constexpr (std::is_same_v<T, SkeletalAnimation>) {
+        mSkeletalAnimationsPool_.remove(handle);
+    } else {
+        throw std::runtime_error(std::string("release: unsupported resource type: ") + typeid(T).name());
+    }
 }
 
 void Resources::releaseAll() {
-    // mMeshes_.clear();
-    // mModels_.clear();
-    // for (auto& [_, eachSampler]: mSamplers_) {
-    //     vkDestroySampler(mGraphicsContext_.getDevice(), *eachSampler, nullptr);
-    // }
-    // mSamplers_.clear(); // free all
-    // mTextures_.clear();
-    // mPipelineResources_.clear();
-    // mMaterials_.clear();
-    // mAudios_.clear();
-    // mFonts_.clear();
+    // Clear all resource pools in proper order
+    mMeshesPool_.clear();
+    mModelsPool_.clear();
+    mSamplersPool_.clear();
+    mTexturesPool_.clear();
+    mPipePool_.clear();
+    mMaterialsPool_.clear();
+    mAudiosPool_.clear();
+    mFontsPool_.clear();
+    mAnimations2DPool_.clear();
+    mAnimatedMeshesPool_.clear();
+    mSkeletalAnimationsPool_.clear();
 }
 
 // END Resources
@@ -313,5 +329,8 @@ INSTANTIATE_RESOURCE_POOL(PipelineResource)
 INSTANTIATE_RESOURCE_POOL(Material)
 INSTANTIATE_RESOURCE_POOL(Audio)
 INSTANTIATE_RESOURCE_POOL(Font)
+INSTANTIATE_RESOURCE_POOL(Animation2D)
+INSTANTIATE_RESOURCE_POOL(AnimatedMesh)
+INSTANTIATE_RESOURCE_POOL(SkeletalAnimation)
 
 } // namespace clay

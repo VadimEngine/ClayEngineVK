@@ -75,6 +75,8 @@ bool InputHandlerDesktop::isMouseButtonPressed(MouseEvent::Button button) {
 }
 
 void InputHandlerDesktop::onMousePress(MouseEvent::Button button) {
+    mMouseStates_[static_cast<int>(button)] = true;
+    
     mMouseEventQueue_.push(MouseEvent(
         MouseEvent::Type::PRESS,
         button,
@@ -85,6 +87,8 @@ void InputHandlerDesktop::onMousePress(MouseEvent::Button button) {
 }
 
 void InputHandlerDesktop::onMouseRelease(MouseEvent::Button button) {
+    mMouseStates_[static_cast<int>(button)] = false;
+    
     mMouseEventQueue_.push(MouseEvent(
         MouseEvent::Type::RELEASE,
         button,

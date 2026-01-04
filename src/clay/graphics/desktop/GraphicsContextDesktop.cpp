@@ -29,15 +29,15 @@ const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
-// void DestroyDebugUtilsMessengerEXT(vk::Instance instance, vk::DebugUtilsMessengerEXT debugMessenger, const vk::AllocationCallbacks* pAllocator){
-//     auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-//         instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT")
-//     );
+void DestroyDebugUtilsMessengerEXT(vk::Instance instance, vk::DebugUtilsMessengerEXT debugMessenger, const vk::AllocationCallbacks* pAllocator){
+    auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+        instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT")
+    );
 
-//     if (func) {
-//         func(static_cast<VkInstance>(instance), static_cast<VkDebugUtilsMessengerEXT>(debugMessenger), reinterpret_cast<const VkAllocationCallbacks*>(pAllocator));
-//     }
-// }
+    if (func) {
+        func(static_cast<VkInstance>(instance), static_cast<VkDebugUtilsMessengerEXT>(debugMessenger), reinterpret_cast<const VkAllocationCallbacks*>(pAllocator));
+    }
+}
 
 vk::Result CreateDebugUtilsMessengerEXT(
     vk::Instance instance,
@@ -844,7 +844,7 @@ void GraphicsContextDesktop::cleanUp() {
     mDevice_.destroy();
 
     if (enableValidationLayers) {
-        // mInstance_.destroyDebugUtilsMessengerEXT(mDebugMessenger_, nullptr);
+        DestroyDebugUtilsMessengerEXT(mInstance_, mDebugMessenger_, nullptr);
     }
 
     mInstance_.destroySurfaceKHR(mSurface_);

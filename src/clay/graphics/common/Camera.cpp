@@ -51,17 +51,22 @@ void Camera::zoom(const float zoomAdjust) {
     }
 }
 
-void Camera::setMode(const CameraMode mode) {
+void Camera::setMode(const Camera::Mode mode) {
     mMode_ = mode;
 }
 
 glm::mat4 Camera::getProjectionMatrix() const {
-    if (mMode_ == CameraMode::PERSPECTIVE) {
+    if (mMode_ == Camera::Mode::PERSPECTIVE) {
         auto projection = glm::perspective(glm::radians(mFOV_), mAspectRatio_, 0.1f, 100.0f);
         projection[1][1] *= -1; // needed for vulkan since y points down
         return projection;
-    } else if (mMode_ == CameraMode::ORTHOGONAL) {
-        return glm::ortho(-2.0f, +2.0f, -1.5f, +1.5f, 0.1f, 100.0f);
+    } else if (mMode_ == Camera::Mode::ORTHOGRAPHIC) {
+        auto projection = glm::ortho(-2.0f, +2.0f, -1.5f, +1.5f, 0.1f, 100.0f);
+        projection[1][1] *= -1; // needed for vulkan since y points down
+        // Vulkan uses [0,1] depth range, not [-1,1] like OpenGL
+        projection[2][2] *= 0.5f;
+        projection[3][2] = (projection[3][2] + 1.0f) * 0.5f;
+        return projection;
     }
     return glm::mat4(1);
 }
@@ -106,7 +111,7 @@ float Camera::getAspectRatio() const {
     return mAspectRatio_;
 }
 
-Camera::CameraMode Camera::getMode() const {
+Camera::Mode Camera::getMode() const {
     return mMode_;
 }
 

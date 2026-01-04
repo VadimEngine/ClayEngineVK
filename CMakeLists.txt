@@ -7,6 +7,9 @@ project(${PROJECT_NAME})
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Option to build tests (default OFF so users don't build them)
+option(CLAYENGINE_BUILD_TESTS "Build ClayEngineVK tests" OFF)
+
 # Assimp, sndfile, glfw
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 # assimp
@@ -239,4 +242,10 @@ endif()
 if(CLAY_PLATFORM_DESKTOP)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_DESKTOP)
     target_compile_definitions(${PROJECT_NAME} PUBLIC PX_PHYSX_STATIC_LIB)
+endif()
+
+# Build tests if requested
+if(CLAYENGINE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()

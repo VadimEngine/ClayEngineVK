@@ -14,6 +14,8 @@ SoundSource::SoundSource() {
 }
 
 SoundSource::~SoundSource() {
+    alSourceStop(mSource_);
+    alSourcei(mSource_, AL_BUFFER, 0);
     alDeleteSources(1, &mSource_);
 }
 
@@ -25,6 +27,24 @@ void SoundSource::play(const ALuint buffer_to_play) {
     }
 
     alSourcePlay(mSource_);
+}
+
+void SoundSource::stop() {
+    alSourceStop(mSource_);
+}
+
+void SoundSource::pause() {
+    alSourcePause(mSource_);
+}
+
+void SoundSource::resume() {
+    alSourcePlay(mSource_);
+}
+
+bool SoundSource::isPlaying() const {
+    ALint state;
+    alGetSourcei(mSource_, AL_SOURCE_STATE, &state);
+    return state == AL_PLAYING;
 }
 
 void SoundSource::setGain(float newGain) {

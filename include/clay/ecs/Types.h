@@ -11,6 +11,7 @@
 
 // clay
 #include "clay/application/common/Resources.h"
+
 namespace clay::ecs {
 
 // Used to define the size of arrays later on
@@ -22,10 +23,14 @@ enum ComponentType : uint8_t {
     MODEL, 
     TEXT,
     SPRITE,
+    ANIMATION_2D_RENDERABLE,
+    SKELETAL_ANIMATION_RENDERABLE,
     COLLIDER,
-    RIGID_BODY,
+    PHYSX_RIGID_BODY,
+    PHYSICS_BODY_2D,
     PARENT,
     METADATA, 
+    COLLISION_ACTION,
     MAX_COMPONENTS 
 };
 using Signature = std::bitset<MAX_COMPONENTS>;
@@ -42,8 +47,21 @@ struct Transform {
 struct Collider {
     static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::COLLIDER);
 
+    enum class Type {
+        AABB,
+        CIRCLE,
+    } mType_ = Type::AABB;
+
     glm::vec3 offset = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
+
+    union {
+        struct {
+            glm::vec3 halfExtents;
+        } aabb;
+        struct {
+            float radius;
+        } circle;
+    };
 };
 
 struct Parent {
@@ -55,16 +73,51 @@ struct Parent {
 struct ModelRenderable {
     static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::MODEL);
 
-    Resources::Handle<Model> modelHandle;
+    clay::Handle<Model> modelHandle;
     glm::vec4 mColor_ = {1,1,1,1};
     glm::mat4 localModelMat = glm::identity<glm::mat4>();
+    int renderLayer = 0; // Lower values render first: -100=skybox, 0=default, 100=UI
 };
 
 struct SpriteRenderable {
-    Mesh* mpMesh_;
-    Material* mpMaterial_;
+    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::SPRITE);
+
+    clay::Handle<Mesh> meshHandle;
+    clay::Handle<Material> materialHandle;
     glm::vec4 mSpriteOffset_;
     glm::vec4 mColor_ = {1,1,1,1};
+};
+
+struct Animation2DRenderable {
+    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::ANIMATION_2D_RENDERABLE);
+    
+    clay::Handle<Animation2D> animationHandle;
+    clay::Handle<Mesh> meshHandle;
+    glm::vec4 mColor_ = {1,1,1,1};
+    glm::vec3 mOffset_ = {0,0,0};
+    
+    // Playback state (per-entity)
+    uint32_t currentFrame = 0;
+    float currentTime = 0.0f;
+    bool playing = true;
+};
+
+struct Animation3DRenderable {
+    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::SKELETAL_ANIMATION_RENDERABLE);
+    
+    clay::Handle<AnimatedMesh> meshHandle;
+    clay::Handle<SkeletalAnimation> animationHandle;
+    clay::Handle<Material> materialHandle;
+    glm::vec4 mColor_ = {1,1,1,1};
+    
+    // Bone transforms buffer (shared)
+    vk::Buffer boneTransformsBuffer_{};
+    vk::DeviceMemory boneTransformsMemory_{};
+    
+    // Per-entity playback state
+    float currentTime = 0.0f;
+    bool playing = false;
+    bool looping = true;
 };
 
 struct EntityMetadata {
@@ -73,17 +126,52 @@ struct EntityMetadata {
     bool enabled = true;
 };
 
-struct RigidBody {
-    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::RIGID_BODY);
+struct PhysicsBody2D {
+    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::PHYSICS_BODY_2D);
 
-    physx::PxRigidActor* actor;
-
-    // glm::vec3 velocity = {0.0f, 0.0f, 0.0f};
-    // float mMaxSpeed_ = 100.f;
-    // float mass = 1.0f;
-    // float gravityScale = 0.f;
-    // bool attractive = false;
+    enum class Type {
+        STATIC,      // Immovable (walls, trees)
+        DYNAMIC,     // Full physics (player, enemies, projectiles)
+        KINEMATIC    // Moves but ignores physics (moving platforms)
+    };
     
+    Type type = Type::DYNAMIC;
+    
+    // Dynamic properties (ignored for STATIC)
+    glm::vec2 velocity = {0.0f, 0.0f};
+    float mass = 1.0f;
+    
+    // Collision properties (all types)
+    bool isSolid = true;        // blocks movement
+    bool isTrigger = false;     // only fires events, no blocking
+    float bounciness = 0.0f;
+};
+
+struct PhysXRigidBody {
+    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::PHYSX_RIGID_BODY);
+
+    physx::PxRigidActor* actor;    
+};
+
+struct CollisionEvent {
+
+    enum class Type {
+        ENTER,
+        EXIT
+    } type;
+
+    Entity a;
+    Entity b;
+};
+
+struct CollisionAction {
+    static constexpr uint32_t bit = 1u << static_cast<uint32_t>(ComponentType::COLLISION_ACTION);
+
+    // Called when collision starts
+    std::function<void(Entity other)> onEnter;
+
+    // Called when collision ends
+    std::function<void(Entity other)> onExit;
 };
 
 } // clay::ecs

@@ -25,6 +25,27 @@ public:
     void playSound(unsigned int audioId);
 
     /**
+     * Stop the currently playing audio
+     */
+    void stopSound();
+
+    /**
+     * Pause the currently playing audio
+     */
+    void pauseSound();
+
+    /**
+     * Resume the paused audio
+     */
+    void resumeSound();
+
+    /**
+     * Check if audio is currently playing
+     * @return True if playing, false otherwise
+     */
+    bool isPlaying() const;
+
+    /**
      * Set the gain of the audio source
      * @param newGain Gain to set (0-1.0f)
      */
@@ -32,6 +53,9 @@ public:
 
     /** Get the current Gain */
     float getGain() const;
+
+    /** Clear the source buffer binding before cleanup */
+    void clearSource();
 
     bool isInitialized() const;
 

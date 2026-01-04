@@ -1,12 +1,15 @@
 #pragma once
 // standard lib
 #include <vector>
+#include <cstdint>
+
+// third party
+#include <glm/glm.hpp>
+
 // clay
-#include "clay/graphics/common/Material.h"
-#include "clay/graphics/common/BaseGraphicsContext.h"
-#include "clay/graphics/common/Camera.h"
+#include "clay/application/common/Handle.h"
 #include "clay/graphics/common/Mesh.h"
-#include "clay/utils/common/Utils.h"
+#include "clay/graphics/common/Material.h"
 
 namespace clay {
 
@@ -14,12 +17,12 @@ class Model {
 
 public:
     struct ModelElement {
-        Mesh* mesh; // TODO use id instead
-        Material* material; // TODO use id instead
-        glm::mat4 localTransform = glm::mat4(1); // TODO maybe replace with instance data(mode, color) that is dynamically sized
+        Handle<Mesh> meshHandle;
+        Handle<Material> materialHandle;
+        glm::mat4 localTransform = glm::mat4(1);
     };
 
-    Model(BaseGraphicsContext& gContext);
+    Model() = default;
 
     // move constructor
     Model(Model&& other) noexcept;
@@ -31,10 +34,9 @@ public:
 
     void addElement(const ModelElement& element);
 
-    void render(vk::CommandBuffer cmdBuffer, const void* userPushData, uint32_t userPushSize);
+    const std::vector<ModelElement>& getElements() const { return mModelGroups_; }
 
 private:
-    BaseGraphicsContext& mGraphicsContext_;
     std::vector<ModelElement> mModelGroups_;
 };
 

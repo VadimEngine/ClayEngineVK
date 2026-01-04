@@ -50,10 +50,11 @@ Material::~Material() {
 
 void Material::createDescriptorSet(const MaterialConfig& config) {
     // Allocate descriptor set
-    vk::DescriptorSetAllocateInfo allocInfo{};
-    allocInfo.descriptorPool = mGraphicsContext_.mDescriptorPool_;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &((vk::DescriptorSetLayout&)mPipelineResource_.getDescriptorSetLayout());
+    vk::DescriptorSetAllocateInfo allocInfo{
+        .descriptorPool = mGraphicsContext_.mDescriptorPool_,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &((vk::DescriptorSetLayout&)mPipelineResource_.getDescriptorSetLayout()),
+    };
     
     if (mGraphicsContext_.getDevice().allocateDescriptorSets(&allocInfo, &mDescriptorSet_) != vk::Result::eSuccess) {
         throw std::runtime_error("failed to allocate descriptor sets!");
@@ -62,13 +63,18 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
     std::vector<vk::WriteDescriptorSet> descriptorWrites;
     std::vector<vk::DescriptorBufferInfo> bufferInfos;
     std::vector<vk::DescriptorImageInfo> imageInfos;
+    
+    // Reserve space to prevent reallocation which would invalidate pointers
+    bufferInfos.reserve(config.bufferBindings.size());
+    imageInfos.reserve(config.imageBindings.size() + config.imageArrayBindings.size());
+    descriptorWrites.reserve(config.bufferBindings.size() + config.imageBindings.size() + (config.imageArrayBindings.empty() ? 0 : 1));
 
     // Handle buffer bindings
     for (const auto& binding : config.bufferBindings) {
         bufferInfos.push_back({
-            .buffer = binding.buffer,
-            .offset = 0,
-            .range = binding.size
+           .buffer = binding.buffer,
+           .offset = 0,
+           .range = binding.size
         });
 
         descriptorWrites.push_back({
@@ -84,9 +90,9 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
     // Handle single image bindings
     for (const auto& binding : config.imageBindings) {
         imageInfos.push_back({
-            .sampler = binding.sampler,
-            .imageView = binding.imageView,
-            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+           .sampler = binding.sampler,
+           .imageView = binding.imageView,
+           .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         });
 
         descriptorWrites.push_back({
@@ -110,12 +116,12 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
 
     if (!config.imageArrayBindings.empty()) {
         descriptorWrites.push_back({
-            .dstSet = mDescriptorSet_,
-            .dstBinding = config.imageArrayBindings.front().binding,
-            .dstArrayElement = 0,
-            .descriptorCount = static_cast<uint32_t>(config.imageArrayBindings.size()),
-            .descriptorType = config.imageArrayBindings.front().descriptorType,
-            .pImageInfo = &imageInfos[config.imageBindings.size()]
+           .dstSet = mDescriptorSet_,
+           .dstBinding = config.imageArrayBindings.front().binding,
+           .dstArrayElement = 0,
+           .descriptorCount = static_cast<uint32_t>(config.imageArrayBindings.size()),
+           .descriptorType = config.imageArrayBindings.front().descriptorType,
+           .pImageInfo = &imageInfos[config.imageBindings.size()]
         });
     }
 

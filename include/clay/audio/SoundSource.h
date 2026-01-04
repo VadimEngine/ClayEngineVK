@@ -22,6 +22,27 @@ public:
     void play(const ALuint buffer_to_play);
 
     /**
+     * Stop the currently playing audio
+     */
+    void stop();
+
+    /**
+     * Pause the currently playing audio
+     */
+    void pause();
+
+    /**
+     * Resume the paused audio
+     */
+    void resume();
+
+    /**
+     * Check if audio is currently playing
+     * @return True if playing, false otherwise
+     */
+    bool isPlaying() const;
+
+    /**
      * Set the Gain of this source
      * @param newGain New gain setting
      */
