@@ -4,16 +4,136 @@ namespace clay::ecs {
 
 TextRenderable::TextRenderable() {}
 
-void TextRenderable::initialize(BaseGraphicsContext& gContext, const std::string& text, Font* font) {
-    mText_ = text;
+TextRenderable::~TextRenderable() {
+    if (mpGraphicsContext_ && mVertexBuffer_) {
+        mpGraphicsContext_->getDevice().destroyBuffer(mVertexBuffer_, nullptr);
+        mpGraphicsContext_->getDevice().freeMemory(mVertexBufferMemory_, nullptr);
+    }
+}
+
+TextRenderable::TextRenderable(const TextRenderable& other)
+    : mText_(other.mText_),
+      mpFont_(other.mpFont_),
+      mpGraphicsContext_(other.mpGraphicsContext_),
+      mVertexBuffer_(other.mVertexBuffer_),
+      mVertexBufferMemory_(other.mVertexBufferMemory_),
+      mVertices_(other.mVertices_),
+      mPosition_(other.mPosition_),
+      mOrientation_(other.mOrientation_),
+      mScale_(other.mScale_),
+      mColor_(other.mColor_) {
+    // Transfer ownership by clearing the source's buffer handles
+    const_cast<TextRenderable&>(other).mVertexBuffer_ = vk::Buffer{};
+    const_cast<TextRenderable&>(other).mVertexBufferMemory_ = vk::DeviceMemory{};
+    const_cast<TextRenderable&>(other).mpGraphicsContext_ = nullptr;
+}
+
+TextRenderable& TextRenderable::operator=(const TextRenderable& other) {
+    if (this != &other) {
+        // Clean up existing resources
+        if (mpGraphicsContext_ && mVertexBuffer_) {
+            mpGraphicsContext_->getDevice().destroyBuffer(mVertexBuffer_, nullptr);
+            mpGraphicsContext_->getDevice().freeMemory(mVertexBufferMemory_, nullptr);
+        }
+
+        // Copy data
+        mText_ = other.mText_;
+        mpFont_ = other.mpFont_;
+        mpGraphicsContext_ = other.mpGraphicsContext_;
+        mVertexBuffer_ = other.mVertexBuffer_;
+        mVertexBufferMemory_ = other.mVertexBufferMemory_;
+        mVertices_ = other.mVertices_;
+        mPosition_ = other.mPosition_;
+        mOrientation_ = other.mOrientation_;
+        mScale_ = other.mScale_;
+        mColor_ = other.mColor_;
+
+        // Transfer ownership
+        const_cast<TextRenderable&>(other).mVertexBuffer_ = vk::Buffer{};
+        const_cast<TextRenderable&>(other).mVertexBufferMemory_ = vk::DeviceMemory{};
+        const_cast<TextRenderable&>(other).mpGraphicsContext_ = nullptr;
+    }
+    return *this;
+}
+
+TextRenderable::TextRenderable(TextRenderable&& other) noexcept
+    : mText_(std::move(other.mText_)),
+      mpFont_(other.mpFont_),
+      mpGraphicsContext_(other.mpGraphicsContext_),
+      mVertexBuffer_(other.mVertexBuffer_),
+      mVertexBufferMemory_(other.mVertexBufferMemory_),
+      mVertices_(std::move(other.mVertices_)),
+      mPosition_(other.mPosition_),
+      mOrientation_(other.mOrientation_),
+      mScale_(other.mScale_),
+      mColor_(other.mColor_) {
+    // Clear the moved-from object
+    other.mVertexBuffer_ = vk::Buffer{};
+    other.mVertexBufferMemory_ = vk::DeviceMemory{};
+    other.mpGraphicsContext_ = nullptr;
+}
+
+TextRenderable& TextRenderable::operator=(TextRenderable&& other) noexcept {
+    if (this != &other) {
+        // Clean up existing resources
+        if (mpGraphicsContext_ && mVertexBuffer_) {
+            mpGraphicsContext_->getDevice().destroyBuffer(mVertexBuffer_, nullptr);
+            mpGraphicsContext_->getDevice().freeMemory(mVertexBufferMemory_, nullptr);
+        }
+
+        // Move data
+        mText_ = std::move(other.mText_);
+        mpFont_ = other.mpFont_;
+        mpGraphicsContext_ = other.mpGraphicsContext_;
+        mVertexBuffer_ = other.mVertexBuffer_;
+        mVertexBufferMemory_ = other.mVertexBufferMemory_;
+        mVertices_ = std::move(other.mVertices_);
+        mPosition_ = other.mPosition_;
+        mOrientation_ = other.mOrientation_;
+        mScale_ = other.mScale_;
+        mColor_ = other.mColor_;
+
+        // Clear the moved-from object
+        other.mVertexBuffer_ = vk::Buffer{};
+        other.mVertexBufferMemory_ = vk::DeviceMemory{};
+        other.mpGraphicsContext_ = nullptr;
+    }
+    return *this;
+}
+
+void TextRenderable::setFont(Font* font) {
     mpFont_ = font;
+}
+
+void TextRenderable::setText(BaseGraphicsContext& gContext, const std::string& text) {
+    // Store graphics context for cleanup
+    mpGraphicsContext_ = &gContext;
+    
+    // Return early if text hasn't changed
+    if (mText_ == text) {
+        return;
+    }
+
+    // Clean up old vertex buffer if it exists
+    if (mVertexBuffer_) {
+        // Wait for device to finish using the buffer before destroying it
+        gContext.getDevice().waitIdle();
+        gContext.getDevice().destroyBuffer(mVertexBuffer_, nullptr);
+        gContext.getDevice().freeMemory(mVertexBufferMemory_, nullptr);
+    }
+    
+    // Clear old vertices
+    mVertices_.clear();
+    
+    // Update text and generate new vertices
+    mText_ = text;
     float totalWidth = 0.0f;
     for (const char& c : mText_) {
         const Font::CharacterInfo& glyph = mpFont_->getCharacterInfo(c);
         totalWidth += (glyph.advance >> 6);
     }
 
-    float x =  -totalWidth / 2.0f; // starting x position
+    float x = -totalWidth / 2.0f; // starting x position
     float y = 0.0f; // baseline y position
 
     for (char c : mText_) {
@@ -25,14 +145,11 @@ void TextRenderable::initialize(BaseGraphicsContext& gContext, const std::string
 
         float xpos = x + static_cast<float>(glyph.bitmapLeft);
         float ypos = y + static_cast<float>(glyph.bitmapTop) - static_cast<float>(glyph.height);
-
         float w = static_cast<float>(glyph.width);
         float h = static_cast<float>(glyph.height);
 
-        // Normalized tex coords for full glyph image
         float u0 = 0.0f, v0 = 1.0f;
         float u1 = 1.0f, v1 = 0.0f;
-
         int glyphIndex = static_cast<int>(c);
 
         // Triangle 1
@@ -48,6 +165,7 @@ void TextRenderable::initialize(BaseGraphicsContext& gContext, const std::string
         x += glyph.advance / 64.0f; // advance in pixels
     }
 
+    // Create new vertex buffer
     createVertexBuffer(gContext);
 }
 
@@ -84,11 +202,6 @@ void TextRenderable::createVertexBuffer(BaseGraphicsContext& gContext) {
 
     gContext.getDevice().destroyBuffer(stagingBuffer, nullptr);
     gContext.getDevice().freeMemory(stagingBufferMemory, nullptr);
-}
-
-void TextRenderable::finalize(BaseGraphicsContext& gContext) {
-    gContext.getDevice().destroyBuffer(mVertexBuffer_, nullptr);
-    gContext.getDevice().freeMemory(mVertexBufferMemory_, nullptr);
 }
 
 void TextRenderable::render(vk::CommandBuffer cmdBuffer, const glm::mat4& parentModelMat) {

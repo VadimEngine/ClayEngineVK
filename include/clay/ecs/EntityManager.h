@@ -12,8 +12,15 @@
 #include "clay/application/common/Resources.h"
 #include "clay/ecs/Types.h"
 #include "clay/graphics/common/Model.h"
+#include "clay/graphics/common/SkyBox.h"
 #include "clay/ecs/components/TextRenderable.h"
+#include "clay/ecs/systems/CollisionSystem.h"
 #include "clay/ecs/systems/RenderSystem.h"
+#include "clay/ecs/systems/PhysicsSystem.h"
+
+namespace clay {
+    class Tilemap;
+}
 
 namespace clay::ecs {
 
@@ -28,19 +35,25 @@ public:
 
     void destroyEntity(Entity entity);
 
-    void addModelRenderable(Entity e, const ModelRenderable& comp);
+    // Template for adding components
+    template<typename T>
+    void addComponent(Entity e, const T& comp);
 
-    void addTextRenderable(Entity e, const TextRenderable& comp);
+    // Skybox management (optional, only one per scene)
+    void setSkybox(clay::Handle<Mesh> meshHandle, clay::Handle<Material> materialHandle);
+    bool hasSkybox() const { return mSkybox_ != nullptr; }
+    SkyBox* getSkybox() const { return mSkybox_.get(); }
 
-    void addTransform(Entity e, const Transform& comp);
+    // Tilemap management (can have multiple)
+    void addTilemap(clay::Tilemap* tilemap);
+    void removeTilemap(clay::Tilemap* tilemap);
+    const std::vector<clay::Tilemap*>& getTilemaps() const { return mTilemaps_; }
 
-    void addCollider(Entity e, const Collider& comp);
+    // Clean up PhysX actors before scene destruction
+    void releasePhysicsActors();
 
-    void addRigidBody(Entity e, const RigidBody& comp);
-
-    void addSpriteRenderable(Entity e, const SpriteRenderable& comp);
-
-    void addMetaData(Entity e, const EntityMetadata& comp);
+    // Clean up bone buffers for skeletal animation renderables
+    void releaseBoneBuffers();
 
     // for now, have update/render in here?
     void render(vk::CommandBuffer cmdBuffer);
@@ -48,8 +61,11 @@ public:
     void update(float dt);
 
 //private:
+    BaseGraphicsContext& mGraphicsContext_;
     Resources& mResources_;
+    CollisionSystem mCollisionSystem_;
     RenderSystem mRenderSystem_;
+    PhysicsSystem mPhysicsSystem_;
 
     std::vector<Entity> mFreeEntities;
     std::set<Entity> mCurrentEntities_;
@@ -57,12 +73,21 @@ public:
     std::array<Signature, MAX_ENTITIES> mSignatures{};
 
     std::array<Transform, MAX_ENTITIES> mTransforms;
+    std::array<Parent, MAX_ENTITIES> mParents;
     std::array<ModelRenderable, MAX_ENTITIES> mModelRenderable;
     std::array<TextRenderable, MAX_ENTITIES> mTextRenderables;
-    std::array<SpriteRenderable, MAX_ENTITIES> mSpriteRenderables; 
+    std::array<SpriteRenderable, MAX_ENTITIES> mSpriteRenderables;
+    std::array<Animation2DRenderable, MAX_ENTITIES> mAnimation2DRenderables;
+    std::array<Animation3DRenderable, MAX_ENTITIES> mAnimation3DRenderables;
     std::array<Collider, MAX_ENTITIES> mColliders;
-    std::array<RigidBody, MAX_ENTITIES> mRigidBodies;
+    std::array<PhysXRigidBody, MAX_ENTITIES> mPhysXRigidBodies;
+    std::array<PhysicsBody2D, MAX_ENTITIES> mPhysicsBodies2D;
     std::array<EntityMetadata, MAX_ENTITIES> mMetaData;
+    std::array<CollisionAction, MAX_ENTITIES> mCollisionActions;
+
+private:
+    std::unique_ptr<SkyBox> mSkybox_; // Optional scene skybox
+    std::vector<clay::Tilemap*> mTilemaps_; // List of tilemaps in the scene
 };
 
 } // namespace clay::ecs

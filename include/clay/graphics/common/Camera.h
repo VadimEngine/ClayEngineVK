@@ -10,7 +10,7 @@ namespace clay {
 class Camera {
 public:
     /** Camera mode options */
-    enum class CameraMode {PERSPECTIVE=0, ORTHOGONAL};
+    enum class Mode {PERSPECTIVE=0, ORTHOGRAPHIC};
 
 public:
     /** Constructor */
@@ -73,7 +73,7 @@ public:
      * Set the Camera mode (Perspective/Orthogonal )
      * @param mode New Camera mode
      */
-    void setMode(const CameraMode mode);
+    void setMode(const Camera::Mode mode);
 
     /** Get the Projection matrix for this camera (Depends on Camera mode) */
     glm::mat4 getProjectionMatrix() const;
@@ -107,7 +107,7 @@ public:
     float getAspectRatio() const;
 
     /** Get the Cameras mode */
-    CameraMode getMode() const;
+    Camera::Mode getMode() const;
 
     /**
      * Set the camera movement speed
@@ -167,7 +167,7 @@ private:
     /** Aspect ratio for perspective matrix */
     float mAspectRatio_ = 1.f;
     /** The camera's mode */
-    CameraMode mMode_ = CameraMode::PERSPECTIVE;
+    Camera::Mode mMode_ = Camera::Mode::PERSPECTIVE;
     /** Speed the camera moves */
     float mMoveSpeed_ = 10.f;
     /** Speed the camera rotates */

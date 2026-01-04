@@ -23,10 +23,10 @@ AppDesktop::~AppDesktop() {
     mSceneBuffer_[0].reset();
     mSceneBuffer_[1].reset();
     ImGuiComponentDesktop::finalize();
+    // Clear audio source before deleting audio resources
+    mAudioManager_.clearSource();
     mResources_.releaseAll();
     mGraphicsContextDesktop_.cleanUp();
-    // Play "0" audio to clear audio buffer
-    mAudioManager_.playSound(0);
 }
 
 void AppDesktop::run() {
@@ -60,6 +60,8 @@ void AppDesktop::update() {
         mpGraphicsContext_->getDevice().waitIdle(); // wait to allow deleteing current scene
         // switch to scene in back buffer
         mSceneBuffer_[0] = std::move(mSceneBuffer_[1]);
+        // Initialize the new scene
+        mSceneBuffer_[0]->initialize();
     }
 
     if (mSceneBuffer_[0] != nullptr) {

@@ -29,7 +29,7 @@ void convertRGBtoRGBA(ImageData& image) {
     }
 
     // Replace old data
-    image.pixels   = std::move(rgba);
+    image.pixels  = std::move(rgba);
     image.channels = 4;
 }
 

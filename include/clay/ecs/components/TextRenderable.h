@@ -15,18 +15,33 @@ public:
 
     TextRenderable();
 
-    void initialize(BaseGraphicsContext& gContext, const std::string& text, Font* font);
+    ~TextRenderable();
+
+    // Copy constructor - transfer ownership
+    TextRenderable(const TextRenderable& other);
+
+    // Copy assignment - transfer ownership
+    TextRenderable& operator=(const TextRenderable& other);
+
+    // Move constructor
+    TextRenderable(TextRenderable&& other) noexcept;
+
+    // Move assignment
+    TextRenderable& operator=(TextRenderable&& other) noexcept;
+
+    void setFont(Font* font);
+
+    void setText(BaseGraphicsContext& gContext, const std::string& text);
 
     void createVertexBuffer(BaseGraphicsContext& gContext);
-
-    void finalize(BaseGraphicsContext& gContext);
 
     void render(vk::CommandBuffer cmdBuffer, const glm::mat4& parentModelMat);
 
     glm::mat4 getModelMatrix();
 
     std::string mText_;
-    Font* mpFont_;
+    Font* mpFont_ = nullptr;
+    BaseGraphicsContext* mpGraphicsContext_ = nullptr;
     vk::Buffer mVertexBuffer_;
     vk::DeviceMemory mVertexBufferMemory_;
     std::vector<Font::FontVertex> mVertices_;

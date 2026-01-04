@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 // clay
+#include "clay/application/common/Handle.h"
 #include "clay/audio/Audio.h"
 #include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/graphics/common/Mesh.h"
@@ -13,27 +14,26 @@
 #include "clay/graphics/common/Texture.h"
 #include "clay/graphics/common/PipelineResource.h"
 #include "clay/graphics/common/Font.h"
+#include "clay/graphics/common/AnimatedMesh.h"
+#include "clay/graphics/common/SkeletalAnimation.h"
+#include "clay/graphics/common/Animation2D.h"
 #include "clay/utils/common/Utils.h"
 
 namespace clay {
+
 class Resources {
 public:
-    template<typename T>
-    struct Handle {
-        uint32_t index = 0;
-        uint32_t gen = 0;
-    };
-
     template<typename T>
     class ResourcePool {
     public:
         ResourcePool(BaseGraphicsContext& graphicsContext);
 
-        Handle<T> loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName);
-        Handle<T> add(T&& obj, const std::string& name);
-        void remove(Handle<T> handle);
-        T& operator[](Handle<T> handle);
-        Handle<T> getHandle(const std::string& name) const;
+        clay::Handle<T> loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName);
+        clay::Handle<T> add(T&& obj, const std::string& name);
+        void remove(clay::Handle<T> handle);
+        void clear();
+        T& operator[](clay::Handle<T> handle);
+        clay::Handle<T> getHandle(const std::string& name) const;
 
     private:
         BaseGraphicsContext& mGraphicsContext_;
@@ -43,7 +43,7 @@ public:
         // stack of vacant indices
         std::vector<uint32_t> freeList;
         // update when a resource is freed
-        std::unordered_map<std::string, Handle<T>> name2Handle;
+        std::unordered_map<std::string, clay::Handle<T>> name2Handle;
     };
 
     static void setFileLoader(std::function<utils::FileData(const std::string&)> loader);
@@ -57,19 +57,19 @@ public:
     ~Resources();
 
     template<typename T>
-    Resources::Handle<T> loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName);
+    clay::Handle<T> loadResource(const std::vector<std::string>& resourcePaths, const std::string& resourceName);
 
     template<typename T>
-    auto addResource(T&& resource, const std::string& resourceName) -> Handle<std::remove_reference_t<T>>; 
+    auto addResource(T&& resource, const std::string& resourceName) -> clay::Handle<std::remove_reference_t<T>>; 
 
     template<typename T>
-    T& operator[](Handle<T> handle);
+    T& operator[](clay::Handle<T> handle);
 
     template<typename T>
-    Handle<T> getHandle(const std::string& resourceName);
+    clay::Handle<T> getHandle(const std::string& resourceName);
 
     template<typename T>
-    void release(Handle<T> handle);
+    void release(clay::Handle<T> handle);
 
     void releaseAll();
 
@@ -88,6 +88,9 @@ private:
     ResourcePool<Material> mMaterialsPool_;
     ResourcePool<Audio> mAudiosPool_;
     ResourcePool<Font> mFontsPool_;
+    ResourcePool<Animation2D> mAnimations2DPool_;
+    ResourcePool<AnimatedMesh> mAnimatedMeshesPool_;
+    ResourcePool<SkeletalAnimation> mSkeletalAnimationsPool_;
 };
 
 } // namespace clay
