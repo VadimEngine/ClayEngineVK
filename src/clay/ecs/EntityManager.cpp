@@ -51,11 +51,11 @@ void EntityManager::destroyEntity(Entity entity) {
     if (mSignatures[entity][ComponentType::SKELETAL_ANIMATION_RENDERABLE]) {
         auto& animRenderable = mAnimation3DRenderables[entity];
         if (animRenderable.boneTransformsBuffer_) {
-            mGraphicsContext_.getDevice().destroyBuffer(animRenderable.boneTransformsBuffer_);
+            mGraphicsContext_.getDevice().destroyBuffer(animRenderable.boneTransformsBuffer_, nullptr);
             animRenderable.boneTransformsBuffer_ = nullptr;
         }
         if (animRenderable.boneTransformsMemory_) {
-            mGraphicsContext_.getDevice().freeMemory(animRenderable.boneTransformsMemory_);
+            mGraphicsContext_.getDevice().freeMemory(animRenderable.boneTransformsMemory_, nullptr);
             animRenderable.boneTransformsMemory_ = nullptr;
         }
     }
@@ -129,11 +129,11 @@ void EntityManager::releaseBoneBuffers() {
         if (mSignatures[e].test(ComponentType::SKELETAL_ANIMATION_RENDERABLE)) {
             auto& animRenderable = mAnimation3DRenderables[e];
             if (animRenderable.boneTransformsBuffer_) {
-                mGraphicsContext_.getDevice().destroyBuffer(animRenderable.boneTransformsBuffer_);
+                mGraphicsContext_.getDevice().destroyBuffer(animRenderable.boneTransformsBuffer_, nullptr);
                 animRenderable.boneTransformsBuffer_ = nullptr;
             }
             if (animRenderable.boneTransformsMemory_) {
-                mGraphicsContext_.getDevice().freeMemory(animRenderable.boneTransformsMemory_);
+                mGraphicsContext_.getDevice().freeMemory(animRenderable.boneTransformsMemory_, nullptr);
                 animRenderable.boneTransformsMemory_ = nullptr;
             }
         }

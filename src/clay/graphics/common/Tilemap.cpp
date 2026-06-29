@@ -140,8 +140,8 @@ void Tilemap::createInstanceBuffer() {
     mGraphicsContext_.copyBuffer(stagingBuffer, mInstanceBuffer_, bufferSize);
     
     // Clean up staging buffer
-    mGraphicsContext_.getDevice().destroyBuffer(stagingBuffer);
-    mGraphicsContext_.getDevice().freeMemory(stagingBufferMemory);
+    mGraphicsContext_.getDevice().destroyBuffer(stagingBuffer, nullptr);
+    mGraphicsContext_.getDevice().freeMemory(stagingBufferMemory, nullptr);
     
     // Update material descriptor set to include SSBO
     updateMaterialDescriptorSet(bufferSize);
@@ -149,11 +149,11 @@ void Tilemap::createInstanceBuffer() {
 
 void Tilemap::destroyInstanceBuffer() {
     if (mInstanceBuffer_) {
-        mGraphicsContext_.getDevice().destroyBuffer(mInstanceBuffer_);
+        mGraphicsContext_.getDevice().destroyBuffer(mInstanceBuffer_, nullptr);
         mInstanceBuffer_ = nullptr;
     }
     if (mInstanceBufferMemory_) {
-        mGraphicsContext_.getDevice().freeMemory(mInstanceBufferMemory_);
+        mGraphicsContext_.getDevice().freeMemory(mInstanceBufferMemory_, nullptr);
         mInstanceBufferMemory_ = nullptr;
     }
 }

@@ -20,6 +20,9 @@ AppAndroid::~AppAndroid() {
     // delete both scenes before freeing other resources
     mSceneBuffer_[0].reset();
     mSceneBuffer_[1].reset();
+    
+    // Shutdown ImGui
+    ImGuiComponentAndroid::finalize();
 }
 
 void AppAndroid::loadResources() {}
@@ -29,7 +32,7 @@ void AppAndroid::update() {
     mLastTime_ = std::chrono::steady_clock::now();
 
     if (mSceneBuffer_[1]) {
-        vkDeviceWaitIdle(mpGraphicsContext_->getDevice()); // wait to allow deleteing current scene
+        vkDeviceWaitIdle(mpGraphicsContext_->getDevice()); // wait to allow deleting current scene
         // switch to scene in back buffer
         mSceneBuffer_[0] = std::move(mSceneBuffer_[1]);
     }
@@ -57,12 +60,14 @@ void AppAndroid::render() {
         &imageIndex
     );
 
-//    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-//        mpGraphicsContext_->recreateSwapChain(mWindow_);
-//        return;
-//    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-//        throw std::runtime_error("failed to acquire swap chain image!");
-//    }
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        if (mAndroidNativeApp_->window != nullptr) {
+            ((GraphicsContextAndroid*)mpGraphicsContext_.get())->recreateSwapChain(mAndroidNativeApp_);
+        }
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("failed to acquire swap chain image!");
+    }
 
     mpGraphicsContext_->getDevice().resetFences(1, &((GraphicsContextAndroid*)mpGraphicsContext_.get())->mInFlightFences_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_]);
 
@@ -108,12 +113,13 @@ void AppAndroid::render() {
 
     result = vkQueuePresentKHR(((GraphicsContextAndroid*)mpGraphicsContext_.get())->mPresentQueue_, &presentInfo);
 
-//    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || mFramebufferResized_) {
-//        mFramebufferResized_ = false;
-//        mGraphicsContextDesktop_.recreateSwapChain(mWindow_);
-//    } else if (result != VK_SUCCESS) {
-//        throw std::runtime_error("failed to present swap chain image!");
-//    }
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        if (mAndroidNativeApp_->window != nullptr) {
+            ((GraphicsContextAndroid*)mpGraphicsContext_.get())->recreateSwapChain(mAndroidNativeApp_);
+        }
+    } else if (result != VK_SUCCESS) {
+        throw std::runtime_error("failed to present swap chain image!");
+    }
 
     ((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_ = (((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_ + 1) % GraphicsContextAndroid::MAX_FRAMES_IN_FLIGHT;
 }
@@ -232,6 +238,20 @@ utils::ImageData AppAndroid::loadImageFileToMemory(const std::filesystem::path& 
     AAsset_close(asset);
 
     return imageData;
+}
+
+bool AppAndroid::handleInputEvent(AInputEvent* event) {
+    // Process with input handler
+    return mInputHandler_.processInputEvent(event);
+}
+
+InputHandlerAndroid& AppAndroid::getInputHandler() {
+    return mInputHandler_;
+}
+
+void AppAndroid::onWindowRecreated() {
+    // Force swapchain recreation when window is recreated
+    ((GraphicsContextAndroid*)mpGraphicsContext_.get())->recreateSwapChain(mAndroidNativeApp_);
 }
 
 } // namespace clay

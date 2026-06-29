@@ -45,7 +45,7 @@ void ImGuiComponentAndroid::initialize(android_app* app, BaseGraphicsContext* gr
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     //disable .ini file generations
     ImFontConfig font_cfg;
-    font_cfg.SizePixels = 22.0f;
+    font_cfg.SizePixels = 48.0f;  // Larger font for touch-friendly UI (was 22.0f)
     io.Fonts->AddFontDefault(&font_cfg);
     io.IniFilename = nullptr;
 
@@ -65,7 +65,10 @@ void ImGuiComponentAndroid::initialize(android_app* app, BaseGraphicsContext* gr
 
     ImGui_ImplVulkan_Init(&init_info);
     ImGui_ImplVulkan_CreateFontsTexture();
-    ImGui::GetStyle().ScaleAllSizes(4.0f);
+    
+    // Note: Removed ScaleAllSizes() as it breaks input coordinate mapping on Android
+    // Instead, we scale the font size above (22.0f is already larger than default 13.0f)
+    // If UI elements need to be larger, scale them individually or adjust font size further
 }
 
 void ImGuiComponentAndroid::beginRender() {

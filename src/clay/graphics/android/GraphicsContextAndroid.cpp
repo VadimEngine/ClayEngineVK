@@ -10,7 +10,7 @@
 
 namespace clay {
 
-const bool enableValidationLayers = true;
+const bool enableValidationLayers = false;
 
 // Requires VK_EXT_debug_utils instance extension
 VKAPI_ATTR VkBool32 VKAPI_CALL debugMessengerCallback(
@@ -756,7 +756,11 @@ void GraphicsContextAndroid::createSwapChain(android_app* pAndroidApp) {
         createInfo.pQueueFamilyIndices = nullptr;
     }
 
-    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+    // createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // original code
+    // Force identity transform to match window coordinate system
+    // This ensures rendered content aligns with touch input coordinates
+    createInfo.preTransform = vk::SurfaceTransformFlagBitsKHR::eIdentity;
+    // createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
     createInfo.compositeAlpha = compositeAlpha;
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;

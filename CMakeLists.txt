@@ -124,7 +124,7 @@ if(CLAY_PLATFORM_DESKTOP)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glfw)
 endif()
 
-file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 # Add imgui source files
 list(APPEND SRC_FILES

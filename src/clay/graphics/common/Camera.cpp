@@ -61,7 +61,10 @@ glm::mat4 Camera::getProjectionMatrix() const {
         projection[1][1] *= -1; // needed for vulkan since y points down
         return projection;
     } else if (mMode_ == Camera::Mode::ORTHOGRAPHIC) {
-        auto projection = glm::ortho(-2.0f, +2.0f, -1.5f, +1.5f, 0.1f, 100.0f);
+        // Use aspect ratio to compute orthographic bounds
+        float orthoHeight = 1.5f;
+        float orthoWidth = orthoHeight * mAspectRatio_;
+        auto projection = glm::ortho(-orthoWidth, +orthoWidth, -orthoHeight, +orthoHeight, 0.1f, 100.0f);
         projection[1][1] *= -1; // needed for vulkan since y points down
         // Vulkan uses [0,1] depth range, not [-1,1] like OpenGL
         projection[2][2] *= 0.5f;

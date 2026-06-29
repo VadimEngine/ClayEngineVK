@@ -30,6 +30,10 @@ void Resources::setFileLoader(std::function<utils::FileData(const std::string&)>
     loadFileToMemory = std::move(loader);
 }
 
+const std::function<utils::FileData(const std::string&)>& Resources::getFileLoader() {
+    return loadFileToMemory;
+}
+
 void Resources::setResourcePath(const std::filesystem::path& path) {
     RESOURCE_PATH = path;
 }

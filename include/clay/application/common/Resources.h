@@ -48,6 +48,8 @@ public:
 
     static void setFileLoader(std::function<utils::FileData(const std::string&)> loader);
 
+    static const std::function<utils::FileData(const std::string&)>& getFileLoader();
+
     static void setResourcePath(const std::filesystem::path& path);
 
     static const std::filesystem::path& getResourcePath(); 
