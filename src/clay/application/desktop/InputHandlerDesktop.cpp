@@ -38,18 +38,21 @@ InputHandlerDesktop::InputHandlerDesktop() {}
 InputHandlerDesktop::~InputHandlerDesktop() {}
 
 void InputHandlerDesktop::onKeyPressed(int keyCode) {
+    if (keyCode < 0 || keyCode >= static_cast<int>(kKeys)) return;
     mKeyStates_[keyCode] = true;
     mKeyEventQueue_.push(KeyEvent(KeyEvent::Type::PRESS, keyCode));
     trimBuffer(mKeyEventQueue_);
 }
 
 void InputHandlerDesktop::onKeyReleased(int keyCode) {
+    if (keyCode < 0 || keyCode >= static_cast<int>(kKeys)) return;
     mKeyStates_[keyCode] = false;
     mKeyEventQueue_.push(KeyEvent(KeyEvent::Type::RELEASE, keyCode));
     trimBuffer(mKeyEventQueue_);
 }
 
 bool InputHandlerDesktop::isKeyPressed(int keyCode) const {
+    if (keyCode < 0 || keyCode >= static_cast<int>(kKeys)) return false;
     return mKeyStates_[keyCode];
 }
 

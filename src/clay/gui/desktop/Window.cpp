@@ -86,12 +86,11 @@ void framebufferResizeCallback(GLFWwindow* glfwWindow, int width, int height) {
     window->pushEvent(Window::WindowEvent::RESIZED);
 }   
 
-Window::Window(int width, int height) {
+Window::Window(int width, int height, const char* name) {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    // TODO pass in window name
-    mpGLFWWindow_ = glfwCreateWindow(width, height, "Clay Engine VK", nullptr, nullptr);
+    mpGLFWWindow_ = glfwCreateWindow(width, height, name, nullptr, nullptr);
     glfwSetWindowUserPointer(mpGLFWWindow_, this);
 
     glfwSetFramebufferSizeCallback(mpGLFWWindow_, framebufferResizeCallback);

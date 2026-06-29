@@ -16,17 +16,32 @@ void CollisionSystem::update(EntityManager& entityManager, float dt) {
 }
 
 void CollisionSystem::checkCollisions(EntityManager& entityManager) {
-    for (clay::ecs::Entity e: entityManager.mCurrentEntities_) {
-        if (entityManager.mSignatures[e][clay::ecs::ComponentType::METADATA] && !entityManager.mMetaData[e].enabled) {
+    // Partition entities into dynamic and static lists once, upfront.
+    // Static vs static pairs are never checked: they can't move, fire events, or need resolution.
+    std::vector<Entity> dynamicColliders;
+    std::vector<Entity> staticColliders;
+
+    for (clay::ecs::Entity e : entityManager.mCurrentEntities_) {
+        if (entityManager.mSignatures[e][clay::ecs::ComponentType::METADATA] && !entityManager.mMetaData[e].enabled)
             continue;
-        }
+        if (!entityManager.mSignatures[e][clay::ecs::ComponentType::COLLIDER] ||
+            !entityManager.mSignatures[e][clay::ecs::ComponentType::TRANSFORM])
+            continue;
 
-        if (entityManager.mSignatures[e][clay::ecs::ComponentType::COLLIDER] && entityManager.mSignatures[e][clay::ecs::ComponentType::TRANSFORM]) {
-            // check collisions with other entities
-            for (clay::ecs::Entity other: entityManager.mCurrentEntities_) {
-                if (e == other) continue;
+        bool isStatic = entityManager.mSignatures[e][clay::ecs::ComponentType::PHYSICS_BODY_2D] &&
+                        entityManager.mPhysicsBodies2D[e].type == PhysicsBody2D::Type::STATIC;
+        (isStatic ? staticColliders : dynamicColliders).push_back(e);
+    }
 
-                if (entityManager.mSignatures[other][clay::ecs::ComponentType::COLLIDER] && entityManager.mSignatures[other][clay::ecs::ComponentType::TRANSFORM]) {
+    // Track collisions found this frame
+    std::set<std::pair<Entity, Entity>> currentFrameCollisions;
+
+    // Helper lambda to test one pair and record a collision if found.
+    auto testPair = [&](clay::ecs::Entity e, clay::ecs::Entity other) {
+        if (e == other) return;
+        if (e > other) return; // check each pair once
+
+        if (entityManager.mSignatures[other][clay::ecs::ComponentType::COLLIDER] && entityManager.mSignatures[other][clay::ecs::ComponentType::TRANSFORM]) {
                     // simple AABB collision detection for example
                     const auto& transformA = entityManager.mTransforms[e];
                     const auto& colliderA = entityManager.mColliders[e];
@@ -38,10 +53,14 @@ void CollisionSystem::checkCollisions(EntityManager& entityManager) {
                     if (colliderA.mType_ == Collider::Type::AABB && colliderB.mType_ == Collider::Type::AABB) {
                         glm::vec3 posA = transformA.mPosition_ + colliderA.offset;
                         glm::vec3 posB = transformB.mPosition_ + colliderB.offset;
+                        
+                        // Apply scale to halfExtents to match debug rendering
+                        glm::vec3 halfExtentsA = colliderA.aabb.halfExtents * transformA.mScale_;
+                        glm::vec3 halfExtentsB = colliderB.aabb.halfExtents * transformB.mScale_;
 
-                        if (std::abs(posA.x - posB.x) <= (colliderA.aabb.halfExtents.x + colliderB.aabb.halfExtents.x) &&
-                            std::abs(posA.y - posB.y) <= (colliderA.aabb.halfExtents.y + colliderB.aabb.halfExtents.y) &&
-                            std::abs(posA.z - posB.z) <= (colliderA.aabb.halfExtents.z + colliderB.aabb.halfExtents.z)) {
+                        if (std::abs(posA.x - posB.x) <= (halfExtentsA.x + halfExtentsB.x) &&
+                            std::abs(posA.y - posB.y) <= (halfExtentsA.y + halfExtentsB.y) &&
+                            std::abs(posA.z - posB.z) <= (halfExtentsA.z + halfExtentsB.z)) {
                             isColliding = true;
                         }
                     } else if (colliderA.mType_ == Collider::Type::CIRCLE && colliderB.mType_ == Collider::Type::CIRCLE) {
@@ -83,22 +102,59 @@ void CollisionSystem::checkCollisions(EntityManager& entityManager) {
                     }
 
                     if (isColliding) {
+                        // Track this collision
+                        auto pair = std::make_pair(std::min(e, other), std::max(e, other));
+                        currentFrameCollisions.insert(pair);
+
                         // Only create collision events if at least one entity has COLLISION_ACTION
                         bool hasCollisionAction = entityManager.mSignatures[e][clay::ecs::ComponentType::COLLISION_ACTION] ||
                                                   entityManager.mSignatures[other][clay::ecs::ComponentType::COLLISION_ACTION];
-                        
+
                         if (hasCollisionAction) {
-                            CollisionEvent event;
-                            event.type = CollisionEvent::Type::ENTER;
-                            event.a = e;
-                            event.b = other;
-                            mCollisionEvents_.push(event);
+                            // Check if this is a new collision (ENTER)
+                            if (mCollidingPairs_.find(pair) == mCollidingPairs_.end()) {
+                                LOG_I("Collision ENTER: Entity %u <-> Entity %u", e, other);
+                                CollisionEvent event;
+                                event.type = CollisionEvent::Type::ENTER;
+                                event.a = e;
+                                event.b = other;
+                                mCollisionEvents_.push(event);
+                            }
                         }
                     }
                 }
+    };
+
+    // dynamic vs dynamic
+    for (size_t i = 0; i < dynamicColliders.size(); ++i)
+        for (size_t j = i + 1; j < dynamicColliders.size(); ++j)
+            testPair(dynamicColliders[i], dynamicColliders[j]);
+
+    // dynamic vs static  (static vs static is intentionally skipped)
+    for (clay::ecs::Entity d : dynamicColliders)
+        for (clay::ecs::Entity s : staticColliders)
+            testPair(std::min(d, s), std::max(d, s));
+
+    // Check for collisions that ended (EXIT events)
+    for (const auto& pair : mCollidingPairs_) {
+        if (currentFrameCollisions.find(pair) == currentFrameCollisions.end()) {
+            // Collision ended
+            bool hasCollisionAction = entityManager.mSignatures[pair.first][clay::ecs::ComponentType::COLLISION_ACTION] ||
+                                      entityManager.mSignatures[pair.second][clay::ecs::ComponentType::COLLISION_ACTION];
+            
+            if (hasCollisionAction) {
+                LOG_I("Collision EXIT: Entity %u <-> Entity %u", pair.first, pair.second);
+                CollisionEvent event;
+                event.type = CollisionEvent::Type::EXIT;
+                event.a = pair.first;
+                event.b = pair.second;
+                mCollisionEvents_.push(event);
             }
         }
     }
+    
+    // Update tracked collisions for next frame
+    mCollidingPairs_ = currentFrameCollisions;
 
 }
 
@@ -177,8 +233,10 @@ void CollisionSystem::resolveCollisions(EntityManager& entityManager) {
         if (entityManager.mSignatures[event.a][clay::ecs::ComponentType::COLLISION_ACTION]) {
             const auto& collisionActionA = entityManager.mCollisionActions[event.a];
             if (event.type == CollisionEvent::Type::ENTER && collisionActionA.onEnter) {
+                LOG_I("Invoking onEnter callback for Entity %u (other: %u)", event.a, event.b);
                 collisionActionA.onEnter(event.b);
             } else if (event.type == CollisionEvent::Type::EXIT && collisionActionA.onExit) {
+                LOG_I("Invoking onExit callback for Entity %u (other: %u)", event.a, event.b);
                 collisionActionA.onExit(event.b);
             }
         }
@@ -186,8 +244,10 @@ void CollisionSystem::resolveCollisions(EntityManager& entityManager) {
         if (entityManager.mSignatures[event.b][clay::ecs::ComponentType::COLLISION_ACTION]) {
             const auto& collisionActionB = entityManager.mCollisionActions[event.b];
             if (event.type == CollisionEvent::Type::ENTER && collisionActionB.onEnter) {
+                LOG_I("Invoking onEnter callback for Entity %u (other: %u)", event.b, event.a);
                 collisionActionB.onEnter(event.a);
             } else if (event.type == CollisionEvent::Type::EXIT && collisionActionB.onExit) {
+                LOG_I("Invoking onExit callback for Entity %u (other: %u)", event.b, event.a);
                 collisionActionB.onExit(event.a);
             }
         }

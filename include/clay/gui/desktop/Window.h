@@ -20,7 +20,7 @@ public:
         RESIZED, CLOSED, FOCUS_GAINED, FOCUS_LOST
     };
 
-    Window(int width = DEFAULT_WIDTH, int height = DEFAULT_HEIGHT);
+    Window(int width = DEFAULT_WIDTH, int height = DEFAULT_HEIGHT, const char* name = "Clay Engine VK");
 
     ~Window();
 

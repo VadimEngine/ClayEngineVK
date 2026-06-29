@@ -160,6 +160,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/json/include
     ${PHYSX_ROOT_DIR}/include
     ${PXSHARED_PATH}/include
 )

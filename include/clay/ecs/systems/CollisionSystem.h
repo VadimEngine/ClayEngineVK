@@ -1,6 +1,7 @@
 #pragma once
 // standard lib
 #include <queue>
+#include <set>
 // clay
 #include "clay/ecs/Types.h"
 
@@ -38,11 +39,12 @@ public:
     
     // Detect and resolve overlapping collisions iteratively (called by PhysicsSystem)
     void resolveOverlappingCollisions(EntityManager& entityManager, int maxIterations = 1);
-    
-    // TODO set of currently colliding entity pairs (both ways)
 
 private:
     std::queue<CollisionEvent> mCollisionEvents_;
+    
+    // Track currently colliding entity pairs to detect ENTER/EXIT events
+    std::set<std::pair<Entity, Entity>> mCollidingPairs_;
 
 };
 
