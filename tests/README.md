@@ -23,12 +23,20 @@ Tests are organized by platform to ensure that platform-specific code works corr
 
 ### Cross-Platform Tests
 
-Tests in the root `unit/` directory test functionality that should work the same across all platforms:
+Tests in `unit/common/` cover code that behaves the same on every platform and needs no
+window or graphics device, so they run anywhere, including on a build server:
 
-- **Resources** - Resource management, loading, and cleanup
-- **ECS** - Entity Component System functionality
-- **Math** - Vector, matrix, and quaternion operations (future)
-- **Audio** - Audio system (future)
+| File | Covers |
+|---|---|
+| `CameraTest.cpp` | The camera's conventions: -Z forward, +Y up, Vulkan's Y-down projection, aiming with `quatLookAt`, moving, rotating, zoom |
+| `CollisionTest.cpp` | 2D box collision: overlap detection, the shortest push apart, and which body moves (static, dynamic, non-solid) |
+| `ECSTest.cpp` | Entity Component System limits |
+| `FrustumTest.cpp` | Frustum culling against a brute-force clip-space check |
+| `ProfilerTest.cpp` | The frame profiler: per-frame averages, peaks, windows, and that it records nothing while off |
+| `ResourcesTest.cpp` | Resource handles |
+| `UtilsTest.cpp` | RGB to RGBA image conversion |
+
+Code that needs a Vulkan device (rendering, textures, the entity manager) is not covered here.
 
 ## Running Tests
 
@@ -92,7 +100,7 @@ ctest --test-dir build --verbose
 ### Test File Naming Convention
 
 - Platform-specific: `<Feature>Test.cpp` in `unit/<platform>/`
-- Cross-platform: `<Feature>Test.cpp` in `unit/`
+- Cross-platform: `<Feature>Test.cpp` in `unit/common/` (add it to `COMMON_TEST_SOURCES` in `CMakeLists.txt`)
 - Example: `AppDesktopTest.cpp`, `ResourcesTest.cpp`, `PhysicsTest.cpp`
 
 ### Basic Test Structure

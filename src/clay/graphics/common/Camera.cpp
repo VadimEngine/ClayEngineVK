@@ -57,7 +57,7 @@ void Camera::setMode(const Camera::Mode mode) {
 
 glm::mat4 Camera::getProjectionMatrix() const {
     if (mMode_ == Camera::Mode::PERSPECTIVE) {
-        auto projection = glm::perspective(glm::radians(mFOV_), mAspectRatio_, 0.1f, 100.0f);
+        auto projection = glm::perspective(glm::radians(mFOV_), mAspectRatio_, mNear_, mFar_);
         projection[1][1] *= -1; // needed for vulkan since y points down
         return projection;
     } else if (mMode_ == Camera::Mode::ORTHOGRAPHIC) {
@@ -158,6 +158,14 @@ float Camera::getNear() const {
 
 float Camera::getFar() const {
     return mFar_;
+}
+
+void Camera::setNear(float newNear) {
+    mNear_ = newNear;
+}
+
+void Camera::setFar(float newFar) {
+    mFar_ = newFar;
 }
 
 } // namespace clay

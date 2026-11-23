@@ -55,8 +55,34 @@ public:
     // Clean up bone buffers for skeletal animation renderables
     void releaseBoneBuffers();
 
+    // Bone palette size every skinned material/shader is built for.
+    static constexpr uint32_t kMaxBones = 100;
+
+    // Create `anim`'s bone-palette uniform buffer: identity-filled and persistently
+    // mapped. Call before building the entity's material and addComponent().
+    void createBoneBuffer(Animation3DRenderable& anim, uint32_t maxBones = kMaxBones);
+
+    // Copy a pose (bone matrices) into a skinned renderable's palette. Cheap: the
+    // buffer stays mapped for its lifetime. No-op if it has no buffer.
+    void uploadBones(Animation3DRenderable& anim, const glm::mat4* bones, size_t count);
+    void uploadBones(Entity e, const std::vector<glm::mat4>& bones) {
+        uploadBones(mAnimation3DRenderables[e], bones.data(), bones.size());
+    }
+
+    // Frustum culling for render() (see RenderSystem::setCullingViewProj).
+    void setCullingViewProj(const glm::mat4& viewProj) { mRenderSystem_.setCullingViewProj(viewProj); }
+
     // for now, have update/render in here?
     void render(vk::CommandBuffer cmdBuffer);
+
+    // Render static shadow casters into the bound depth pass (see RenderSystem).
+    void renderShadowCasters(vk::CommandBuffer cmdBuffer, Material& shadowMaterial,
+                             const glm::mat4& lightViewProj) {
+        mRenderSystem_.renderShadowCasters(*this, cmdBuffer, shadowMaterial, lightViewProj);
+    }
+
+    // Global tint for 3D world renderables (see RenderSystem::setWorldTint).
+    void setWorldTint(const glm::vec3& tint) { mRenderSystem_.setWorldTint(tint); }
 
     void update(float dt);
 

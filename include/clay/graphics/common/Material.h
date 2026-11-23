@@ -3,6 +3,7 @@
 #include <vector>
 #include <array>
 // clay
+#include "clay/application/common/Handle.h"
 #include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/graphics/common/PipelineResource.h"
 #include "clay/graphics/common/UniformBuffer.h"
@@ -66,13 +67,34 @@ public:
     vk::DescriptorSetLayout getDescriptorSetLayout() const;
 
     const vk::DescriptorSet& getDescriptorSet() const;
-    
+
+    // Return this material's descriptor set to the pool. Nothing does this automatically
+    // (the destructor leaves it to the pool's own destruction), so an app that makes
+    // materials per scene / per entity must call it when they are done with, or the pool
+    // (GraphicsContext: 1024 sets) runs out. The device must be idle; the material must
+    // not be drawn with again.
+    void freeDescriptorSet();
+
+    const PipelineResource& getPipelineResource() const { return mPipelineResource_; }
+
+    // GPU instancing: the same material built on a pipeline that reads its model
+    // matrix + colour per instance (see InstanceData.h). When set, the render system
+    // draws every object sharing a mesh + this material in one instanced call.
+    void setInstancedVariant(clay::Handle<Material> instanced) {
+        mInstancedVariant_ = instanced;
+        mHasInstancedVariant_ = true;
+    }
+    bool hasInstancedVariant() const { return mHasInstancedVariant_; }
+    clay::Handle<Material> getInstancedVariant() const { return mInstancedVariant_; }
+
 private:
     void createDescriptorSet(const MaterialConfig& config);
 
     BaseGraphicsContext& mGraphicsContext_;
     PipelineResource& mPipelineResource_; // TODO i think this should be a handle?
     vk::DescriptorSet mDescriptorSet_;
+    clay::Handle<Material> mInstancedVariant_{};
+    bool mHasInstancedVariant_ = false;
 
     std::vector<UniformBuffer> mUniformBuffers_;
 };

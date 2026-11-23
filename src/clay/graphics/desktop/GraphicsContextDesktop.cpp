@@ -1,12 +1,16 @@
 #ifdef CLAY_PLATFORM_DESKTOP
 
 // standard lib
+#include <cstring>
 #include <iostream>
+#include <vector>
 #include <set>
 #include <algorithm>
 // third party
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 // clay
 #include "clay/application/common/BaseScene.h"
 // class
@@ -63,6 +67,14 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     vk::DebugUtilsMessageTypeFlagsEXT messageType,
     const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData) {
+    using Sev = vk::DebugUtilsMessageSeverityFlagBitsEXT;
+    using Type = vk::DebugUtilsMessageTypeFlagBitsEXT;
+    // Performance messages are optimization hints, not correctness problems (e.g. the
+    // expected "vertex attribute at location N not consumed by vertex shader" from
+    // pipelines that bind a full vertex layout but whose shader reads a subset). Skip
+    // them, and skip info/verbose chatter — surface only real warnings and errors.
+    if (messageType & Type::ePerformance) return VK_FALSE;
+    if (!(messageSeverity & (Sev::eWarning | Sev::eError))) return VK_FALSE;
     std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
     return VK_FALSE;
 }
@@ -105,6 +117,8 @@ void GraphicsContextDesktop::initialize(Window& window) {
         sizeof(clay::BaseScene::CameraConstant),
         nullptr
     );
+
+    createShadowResources();
 }
 
 bool GraphicsContextDesktop::checkValidationLayerSupport() {
@@ -171,8 +185,11 @@ void GraphicsContextDesktop::createLogicalDevice() {
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
+    vk::PhysicalDeviceFeatures supportedFeatures = mPhysicalDevice_.getFeatures();
     vk::PhysicalDeviceFeatures deviceFeatures{};
     deviceFeatures.samplerAnisotropy = vk::True;
+    // Wireframe (VK_POLYGON_MODE_LINE) pipelines are allowed where the GPU supports them.
+    deviceFeatures.fillModeNonSolid = supportedFeatures.fillModeNonSolid;
 
     vk::DeviceCreateInfo createInfo{
         .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
@@ -295,7 +312,7 @@ void GraphicsContextDesktop::setupDebugMessenger() {
 
 void GraphicsContextDesktop::populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo) {
     createInfo = vk::DebugUtilsMessengerCreateInfoEXT{
-        .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+        .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
         .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
         .pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback),
         .pUserData = nullptr
@@ -487,12 +504,21 @@ vk::Format GraphicsContextDesktop::findSupportedFormat(const std::vector<vk::For
     throw std::runtime_error("failed to find supported format!");
 }
 
+// True if the depth format also carries a stencil component.
+static bool depthFormatHasStencil(vk::Format format) {
+    return format == vk::Format::eD32SfloatS8Uint
+        || format == vk::Format::eD24UnormS8Uint
+        || format == vk::Format::eD16UnormS8Uint;
+}
+
 vk::Format GraphicsContextDesktop::findDepthFormat() {
+    // Prefer formats that include a STENCIL component so effects like stencil
+    // outlines work; fall back to depth-only if the device supports neither.
     return findSupportedFormat(
         {
-            vk::Format::eD32Sfloat,
             vk::Format::eD32SfloatS8Uint,
-            vk::Format::eD24UnormS8Uint
+            vk::Format::eD24UnormS8Uint,
+            vk::Format::eD32Sfloat
         },
         vk::ImageTiling::eOptimal,
         vk::FormatFeatureFlagBits::eDepthStencilAttachment
@@ -518,7 +544,7 @@ void GraphicsContextDesktop::createRenderPass() {
         .samples = mMSAASamples_,
         .loadOp = vk::AttachmentLoadOp::eClear,
         .storeOp = vk::AttachmentStoreOp::eDontCare,
-        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+        .stencilLoadOp = vk::AttachmentLoadOp::eClear,   // clear stencil each frame (for stencil outlines)
         .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
         .initialLayout = vk::ImageLayout::eUndefined,
         .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
@@ -620,7 +646,8 @@ void GraphicsContextDesktop::createSwapChain(Window& mWindow) {
         .imageColorSpace = surfaceFormat.colorSpace,
         .imageExtent = extent,
         .imageArrayLayers = 1,
-        .imageUsage =  vk::ImageUsageFlagBits::eColorAttachment,
+        // TransferSrc so a frame can be read back (captureSwapchainImage).
+        .imageUsage =  vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
     };
 
     QueueFamilyIndices indices = findQueueFamilies(mPhysicalDevice_);
@@ -731,6 +758,11 @@ void GraphicsContextDesktop::recreateSwapChain(Window& window) {
     cleanupSwapChain();
 
     createSwapChain(window);
+    // The frame is now this size: everything that lays itself out or maps the pointer by
+    // getFrameDimensions() (the UI view, picking, 2D overlays) must see the new one.
+    // (Left at the start-up size, the UI stayed laid out for the old window after a
+    // resize / maximise, so the pointer no longer lined up with its buttons.)
+    mFrameDimensions_ = { static_cast<int>(mSwapChainExtent_.width), static_cast<int>(mSwapChainExtent_.height) };
     createImageViews();
     createColorResources();
     createDepthResources();
@@ -800,7 +832,196 @@ void GraphicsContextDesktop::createDepthResources() {
         mDepthImageMemory_
     );
     
-    mDepthImageView_ = createImageView(mDepthImage_, depthFormat, vk::ImageAspectFlagBits::eDepth, 1);
+    vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eDepth;
+    if (depthFormatHasStencil(depthFormat)) aspect |= vk::ImageAspectFlagBits::eStencil;
+    mDepthImageView_ = createImageView(mDepthImage_, depthFormat, aspect, 1);
+}
+
+void GraphicsContextDesktop::createShadowResources() {
+    // Depth format for the shadow map (must be usable as a sampled image).
+    mShadowDepthFormat_ = findSupportedFormat(
+        { vk::Format::eD32Sfloat, vk::Format::eD16Unorm },
+        vk::ImageTiling::eOptimal,
+        vk::FormatFeatureFlagBits::eDepthStencilAttachment | vk::FormatFeatureFlagBits::eSampledImage);
+
+    createImage(
+        SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 1,
+        vk::SampleCountFlagBits::e1,
+        mShadowDepthFormat_,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        mShadowImage_, mShadowImageMemory_);
+
+    mShadowImageView_ = createImageView(mShadowImage_, mShadowDepthFormat_,
+                                        vk::ImageAspectFlagBits::eDepth, 1);
+
+    // Clamp to a white border so anything outside the light's view reads as "lit".
+    vk::SamplerCreateInfo samplerInfo{
+        .magFilter = vk::Filter::eLinear,
+        .minFilter = vk::Filter::eLinear,
+        .mipmapMode = vk::SamplerMipmapMode::eNearest,
+        .addressModeU = vk::SamplerAddressMode::eClampToBorder,
+        .addressModeV = vk::SamplerAddressMode::eClampToBorder,
+        .addressModeW = vk::SamplerAddressMode::eClampToBorder,
+        .borderColor = vk::BorderColor::eFloatOpaqueWhite,
+    };
+    mShadowSampler_ = mDevice_.createSampler(samplerInfo);
+
+    // Depth-only render pass that leaves the map in a shader-readable layout.
+    vk::AttachmentDescription depthAttachment{
+        .format = mShadowDepthFormat_,
+        .samples = vk::SampleCountFlagBits::e1,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+        .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+        .initialLayout = vk::ImageLayout::eUndefined,
+        .finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+    };
+    vk::AttachmentReference depthRef{
+        .attachment = 0,
+        .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    };
+    vk::SubpassDescription subpass{
+        .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+        .colorAttachmentCount = 0,
+        .pDepthStencilAttachment = &depthRef,
+    };
+    // Serialise the undefined->attachment write and the write->sample transitions.
+    std::array<vk::SubpassDependency, 2> deps{};
+    deps[0] = vk::SubpassDependency{
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = vk::PipelineStageFlagBits::eFragmentShader,
+        .dstStageMask = vk::PipelineStageFlagBits::eEarlyFragmentTests,
+        .srcAccessMask = vk::AccessFlagBits::eShaderRead,
+        .dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+        .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
+    deps[1] = vk::SubpassDependency{
+        .srcSubpass = 0,
+        .dstSubpass = VK_SUBPASS_EXTERNAL,
+        .srcStageMask = vk::PipelineStageFlagBits::eLateFragmentTests,
+        .dstStageMask = vk::PipelineStageFlagBits::eFragmentShader,
+        .srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+        .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
+    vk::RenderPassCreateInfo rpInfo{
+        .attachmentCount = 1,
+        .pAttachments = &depthAttachment,
+        .subpassCount = 1,
+        .pSubpasses = &subpass,
+        .dependencyCount = static_cast<uint32_t>(deps.size()),
+        .pDependencies = deps.data(),
+    };
+    mShadowRenderPass_ = mDevice_.createRenderPass(rpInfo);
+
+    vk::FramebufferCreateInfo fbInfo{
+        .renderPass = mShadowRenderPass_,
+        .attachmentCount = 1,
+        .pAttachments = &mShadowImageView_,
+        .width = SHADOW_MAP_SIZE,
+        .height = SHADOW_MAP_SIZE,
+        .layers = 1,
+    };
+    mShadowFramebuffer_ = mDevice_.createFramebuffer(fbInfo);
+
+    // Light-space view*proj matrix, set by the scene each frame.
+    mLightUniform_ = std::make_unique<UniformBuffer>(*this, sizeof(glm::mat4), nullptr);
+}
+
+void GraphicsContextDesktop::beginShadowRenderPass(vk::CommandBuffer cmdBuffer) {
+    vk::ClearValue clear{};
+    clear.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
+
+    vk::RenderPassBeginInfo info{
+        .renderPass = mShadowRenderPass_,
+        .framebuffer = mShadowFramebuffer_,
+        .renderArea = { .offset = {0, 0}, .extent = { SHADOW_MAP_SIZE, SHADOW_MAP_SIZE } },
+        .clearValueCount = 1,
+        .pClearValues = &clear,
+    };
+    cmdBuffer.beginRenderPass(info, vk::SubpassContents::eInline);
+
+    vk::Viewport vp{};
+    vp.x = 0.0f; vp.y = 0.0f;
+    vp.width = static_cast<float>(SHADOW_MAP_SIZE);
+    vp.height = static_cast<float>(SHADOW_MAP_SIZE);
+    vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+    cmdBuffer.setViewport(0, 1, &vp);
+
+    vk::Rect2D sc{ .offset = {0, 0}, .extent = { SHADOW_MAP_SIZE, SHADOW_MAP_SIZE } };
+    cmdBuffer.setScissor(0, 1, &sc);
+}
+
+void GraphicsContextDesktop::endShadowRenderPass(vk::CommandBuffer cmdBuffer) {
+    cmdBuffer.endRenderPass();
+}
+
+bool GraphicsContextDesktop::captureSwapchainImage(uint32_t imageIndex) {
+    const std::string path = mCapturePath_;
+    mCapturePath_.clear();
+    ++mCaptureCount_;
+    if (path.empty() || imageIndex >= mSwapChainImages_.size()) return false;
+
+    const uint32_t width = mSwapChainExtent_.width, height = mSwapChainExtent_.height;
+    const vk::DeviceSize size = static_cast<vk::DeviceSize>(width) * height * 4;
+    vk::Buffer buffer;
+    vk::DeviceMemory memory;
+    createBuffer(size, vk::BufferUsageFlagBits::eTransferDst,
+                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                 buffer, memory);
+
+    const vk::Image image = mSwapChainImages_[imageIndex];
+    const vk::ImageSubresourceRange range{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
+    auto barrier = [&](vk::CommandBuffer cmd, vk::ImageLayout from, vk::ImageLayout to,
+                       vk::AccessFlags srcAccess, vk::AccessFlags dstAccess) {
+        vk::ImageMemoryBarrier b{
+            .srcAccessMask = srcAccess,
+            .dstAccessMask = dstAccess,
+            .oldLayout = from,
+            .newLayout = to,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image,
+            .subresourceRange = range,
+        };
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands,
+                            {}, nullptr, nullptr, b);
+    };
+
+    vk::CommandBuffer cmd = beginSingleTimeCommands();
+    barrier(cmd, vk::ImageLayout::ePresentSrcKHR, vk::ImageLayout::eTransferSrcOptimal,
+            vk::AccessFlagBits::eMemoryRead, vk::AccessFlagBits::eTransferRead);
+    vk::BufferImageCopy region{
+        .bufferOffset = 0,
+        .imageSubresource = { vk::ImageAspectFlagBits::eColor, 0, 0, 1 },
+        .imageOffset = vk::Offset3D{0, 0, 0},
+        .imageExtent = vk::Extent3D{width, height, 1},
+    };
+    cmd.copyImageToBuffer(image, vk::ImageLayout::eTransferSrcOptimal, buffer, region);
+    barrier(cmd, vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::ePresentSrcKHR,
+            vk::AccessFlagBits::eTransferRead, vk::AccessFlagBits::eMemoryRead);
+    endSingleTimeCommands(cmd);   // submits and waits
+
+    // Copy out in one pass before touching the pixels: mapped GPU memory is typically
+    // write-combined, and reading it piecemeal (as the PNG encoder would) takes seconds.
+    std::vector<unsigned char> pixels(static_cast<size_t>(size));
+    std::memcpy(pixels.data(), mDevice_.mapMemory(memory, 0, size), pixels.size());
+    const bool bgra = mSwapChainImageFormat_ == vk::Format::eB8G8R8A8Srgb
+                   || mSwapChainImageFormat_ == vk::Format::eB8G8R8A8Unorm;
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+        if (bgra) std::swap(pixels[i], pixels[i + 2]);
+        pixels[i + 3] = 255;   // the window is opaque whatever alpha the frame left behind
+    }
+    const bool ok = stbi_write_png(path.c_str(), static_cast<int>(width), static_cast<int>(height),
+                                   4, pixels.data(), static_cast<int>(width) * 4) != 0;
+    mDevice_.unmapMemory(memory);
+    mDevice_.destroyBuffer(buffer);
+    mDevice_.freeMemory(memory);
+    return ok;
 }
 
 void GraphicsContextDesktop::createSyncObjects() {
@@ -829,6 +1050,15 @@ void GraphicsContextDesktop::cleanUp() {
     cleanupSwapChain();
     mCameraUniform_.reset();
     mCameraUniformHeadLocked_.reset();
+
+    // Shadow-map resources.
+    mLightUniform_.reset();
+    if (mShadowFramebuffer_) mDevice_.destroyFramebuffer(mShadowFramebuffer_);
+    if (mShadowRenderPass_)  mDevice_.destroyRenderPass(mShadowRenderPass_);
+    if (mShadowSampler_)     mDevice_.destroySampler(mShadowSampler_);
+    if (mShadowImageView_)   mDevice_.destroyImageView(mShadowImageView_);
+    if (mShadowImage_)       mDevice_.destroyImage(mShadowImage_);
+    if (mShadowImageMemory_) mDevice_.freeMemory(mShadowImageMemory_);
 
     mDevice_.destroyRenderPass(mRenderPass_);
 

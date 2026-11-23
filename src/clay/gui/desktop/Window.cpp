@@ -50,6 +50,16 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
                InputHandlerDesktop::MouseEvent::Button::RIGHT
            );
        }
+   } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+       if (action == GLFW_PRESS) {
+           inputHandler.onMousePress(
+               InputHandlerDesktop::MouseEvent::Button::MIDDLE
+           );
+       } else if (action == GLFW_RELEASE) {
+           inputHandler.onMouseRelease(
+               InputHandlerDesktop::MouseEvent::Button::MIDDLE
+           );
+       }
    }
 
    /**
@@ -73,12 +83,20 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
    Window* windowWrapper = static_cast<Window*>(glfwGetWindowUserPointer(window));
    InputHandlerDesktop& inputHandler = (InputHandlerDesktop&)windowWrapper->getInputHandler();
 
-   if (action == GLFW_PRESS) {
+   if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+       // REPEAT (auto-repeat while held) is queued like a press so held editing keys
+       // (backspace, arrows, delete) repeat in text fields. It re-sets an already-set
+       // key bit (harmless) and only the key-EVENT queue grows, which gameplay ignores.
        inputHandler.onKeyPressed(key);
    } else if (action == GLFW_RELEASE) {
        inputHandler.onKeyReleased(key);
    }
-   // GLFW_REPEAT
+}
+
+void charCallback(GLFWwindow* window, unsigned int codepoint) {
+   Window* windowWrapper = static_cast<Window*>(glfwGetWindowUserPointer(window));
+   InputHandlerDesktop& inputHandler = (InputHandlerDesktop&)windowWrapper->getInputHandler();
+   inputHandler.onCharInput(codepoint);
 }
 
 void framebufferResizeCallback(GLFWwindow* glfwWindow, int width, int height) {
@@ -89,6 +107,14 @@ void framebufferResizeCallback(GLFWwindow* glfwWindow, int width, int height) {
 Window::Window(int width, int height, const char* name) {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    // Dev: CLAY_WINDOW_HIDDEN=1 runs without showing a window (frames still render, so
+    // captures work) - for scripted runs that must not pop up over what the user is doing.
+    if (const char* hidden = std::getenv("CLAY_WINDOW_HIDDEN"); hidden && hidden[0] == '1') {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        // No title bar or border either: Windows limits a decorated window to the size of the
+        // screen, and captures are often asked for bigger than that (a phone-sized portrait).
+        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    }
 
     mpGLFWWindow_ = glfwCreateWindow(width, height, name, nullptr, nullptr);
     glfwSetWindowUserPointer(mpGLFWWindow_, this);
@@ -96,6 +122,7 @@ Window::Window(int width, int height, const char* name) {
     glfwSetFramebufferSizeCallback(mpGLFWWindow_, framebufferResizeCallback);
     // key callback
     glfwSetKeyCallback(mpGLFWWindow_, keyCallback);
+    glfwSetCharCallback(mpGLFWWindow_, charCallback);
     // mouse callbacks
     glfwSetCursorPosCallback(mpGLFWWindow_, mouse_callback);
     glfwSetMouseButtonCallback(mpGLFWWindow_, mouse_button_callback);

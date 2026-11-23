@@ -90,6 +90,10 @@ public:
     vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, android_app* pAndroidApp);
 
     void recreateSwapChain(android_app* pAndroidApp);
+    // The activity got a new native window (the app came back from the background): a new
+    // VkSurfaceKHR for it, then a new swapchain. recreateSwapChain alone keeps presenting to
+    // the old window's surface, which shows nothing.
+    void recreateSurface(android_app* pAndroidApp);
 
     void cleanupSwapChain();
 

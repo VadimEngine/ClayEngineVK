@@ -108,10 +108,16 @@ endif()
 # Common/Cross-Platform Tests
 # ==============================================================================
 
-# These tests work across all platforms (ECS, Math, Resources, etc.)
+# These tests work the same on every platform and need no window or graphics device:
+# maths, conventions and bookkeeping (unit/common/).
 set(COMMON_TEST_SOURCES
-    unit/ResourcesTest.cpp
-    unit/ECSTest.cpp
+    unit/common/CameraTest.cpp
+    unit/common/CollisionTest.cpp
+    unit/common/ECSTest.cpp
+    unit/common/FrustumTest.cpp
+    unit/common/ProfilerTest.cpp
+    unit/common/ResourcesTest.cpp
+    unit/common/UtilsTest.cpp
 )
 
 if(COMMON_TEST_SOURCES)

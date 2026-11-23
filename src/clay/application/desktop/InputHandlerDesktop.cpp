@@ -69,6 +69,25 @@ std::optional<InputHandlerDesktop::KeyEvent> InputHandlerDesktop::getKeyEvent() 
         return std::nullopt;
     }
 }
+
+void InputHandlerDesktop::onCharInput(unsigned int codepoint) {
+    mCharEventQueue_.push(codepoint);
+    while (mCharEventQueue_.size() > kMaxQueueSize) mCharEventQueue_.pop();
+}
+
+std::optional<unsigned int> InputHandlerDesktop::getCharEvent() {
+    if (mCharEventQueue_.size() > 0) {
+        unsigned int c = mCharEventQueue_.front();
+        mCharEventQueue_.pop();
+        return c;
+    }
+    return std::nullopt;
+}
+
+void InputHandlerDesktop::clearQueuedInput() {
+    std::queue<KeyEvent>().swap(mKeyEventQueue_);
+    std::queue<unsigned int>().swap(mCharEventQueue_);
+}
 // END KEYBOARD
 
 // START MOUSE
@@ -152,15 +171,19 @@ void InputHandlerDesktop::onMouseWheel(float yOffset) {
 // END MOUSE
 
 template<typename T>
-void InputHandlerDesktop::trimBuffer(T eventQueue) {
+void InputHandlerDesktop::trimBuffer(T& eventQueue) {
+    // NOTE: must take the queue BY REFERENCE. Taking it by value (the old bug)
+    // trimmed a throwaway copy, so the real queue was never capped: every
+    // mouse-move event grew it and copied the whole growing queue, degrading
+    // to O(N) per event (visible as FPS dropping during a long mouse drag).
     while (eventQueue.size() > kMaxQueueSize) {
         eventQueue.pop();
     }
 }
 
 // Explicit instantiate template for expected types
-template void InputHandlerDesktop::InputHandlerDesktop::trimBuffer(std::queue<KeyEvent> eventQueue);
-template void InputHandlerDesktop::InputHandlerDesktop::trimBuffer(std::queue<MouseEvent> eventQueue);
+template void InputHandlerDesktop::InputHandlerDesktop::trimBuffer(std::queue<KeyEvent>& eventQueue);
+template void InputHandlerDesktop::InputHandlerDesktop::trimBuffer(std::queue<MouseEvent>& eventQueue);
 
 } // namespace clay
 

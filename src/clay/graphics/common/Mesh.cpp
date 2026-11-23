@@ -1,9 +1,13 @@
 // standard lib
 #include <stdexcept>
 #include <chrono>
+#include <cmath>
+// third party
+#include <glm/glm.hpp>
 // third party
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
+#include <assimp/material.h>
 #include <assimp/postprocess.h>
 // clay
 #include "clay/utils/common/Logger.h"
@@ -47,6 +51,13 @@ Mesh processMesh(BaseGraphicsContext& gContext, aiMesh* mesh, const aiScene* sce
             vertex.texCoord = glm::vec2(0.0f, 0.0f);
         }
 
+        // per-vertex color (OBJ "v x y z r g b"); white if the mesh has none
+        if (mesh->HasVertexColors(0)) {
+            vertex.color = {mesh->mColors[0][i].r, mesh->mColors[0][i].g, mesh->mColors[0][i].b};
+        } else {
+            vertex.color = {1.0f, 1.0f, 1.0f};
+        }
+
         if (mesh->HasTangentsAndBitangents()) {
             // tangent
             vector.x = mesh->mTangents[i].x;
@@ -79,15 +90,25 @@ Mesh processMesh(BaseGraphicsContext& gContext, aiMesh* mesh, const aiScene* sce
     return {gContext, vertices, indices};
 }
 
-void processNode(BaseGraphicsContext& gContext, aiNode* node, const aiScene* scene, std::vector<Mesh>& meshList) {
+void processNode(BaseGraphicsContext& gContext, aiNode* node, const aiScene* scene,
+                 std::vector<Mesh>& meshList, std::vector<std::string>* matNames) {
     // process all the node's meshes (if any)
     for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
         meshList.push_back(processMesh(gContext, mesh, scene));
+        if (matNames) {
+            std::string nm;
+            if (scene && mesh->mMaterialIndex < scene->mNumMaterials) {
+                aiString s;
+                if (scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, s) == AI_SUCCESS)
+                    nm = s.C_Str();
+            }
+            matNames->push_back(nm);
+        }
     }
     // then do the same for each of its children
     for (unsigned int i = 0; i < node->mNumChildren; ++i) {
-        processNode(gContext, node->mChildren[i], scene, meshList);
+        processNode(gContext, node->mChildren[i], scene, meshList, matNames);
     }
 }
 
@@ -99,8 +120,8 @@ vk::VertexInputBindingDescription Mesh::Vertex::getBindingDescription() {
     };
 }
 
-std::array<vk::VertexInputAttributeDescription, 5> Mesh::Vertex::getAttributeDescriptions() {
-    std::array<vk::VertexInputAttributeDescription, 5> attributeDescriptions{};
+std::array<vk::VertexInputAttributeDescription, 6> Mesh::Vertex::getAttributeDescriptions() {
+    std::array<vk::VertexInputAttributeDescription, 6> attributeDescriptions{};
 
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
@@ -127,10 +148,16 @@ std::array<vk::VertexInputAttributeDescription, 5> Mesh::Vertex::getAttributeDes
     attributeDescriptions[4].format = vk::Format::eR32G32B32Sfloat;
     attributeDescriptions[4].offset = offsetof(Mesh::Vertex, bitangent);
 
+    attributeDescriptions[5].binding = 0;
+    attributeDescriptions[5].location = 5;
+    attributeDescriptions[5].format = vk::Format::eR32G32B32Sfloat;
+    attributeDescriptions[5].offset = offsetof(Mesh::Vertex, color);
+
     return attributeDescriptions;
 }
 
-void Mesh::parseObjFile(BaseGraphicsContext& gContext, utils::FileData& fileData, std::vector<Mesh>& meshList) {
+void Mesh::parseObjFile(BaseGraphicsContext& gContext, utils::FileData& fileData,
+                        std::vector<Mesh>& meshList, std::vector<std::string>* outMaterialNames) {
     Assimp::Importer import;
     const aiScene* scene = import.ReadFileFromMemory(
         fileData.data.get(),
@@ -143,7 +170,7 @@ void Mesh::parseObjFile(BaseGraphicsContext& gContext, utils::FileData& fileData
         return;
     }
     // Process the Assimp node and add to mMeshes_
-    processNode(gContext, scene->mRootNode, scene, meshList);
+    processNode(gContext, scene->mRootNode, scene, meshList, outMaterialNames);
 }
 
 Mesh::Mesh(BaseGraphicsContext& gContext)
@@ -153,6 +180,22 @@ Mesh::Mesh(BaseGraphicsContext& gContext, const std::vector<Vertex>& vertices, c
     : mGraphicsContext_(gContext) {
     createVertexBuffer(vertices);
     createIndexBuffer(indices);
+
+    // Bounding sphere for culling: centre of the AABB, radius to the farthest vertex.
+    if (!vertices.empty()) {
+        glm::vec3 lo = vertices[0].position, hi = vertices[0].position;
+        for (const Vertex& v : vertices) {
+            lo = glm::min(lo, v.position);
+            hi = glm::max(hi, v.position);
+        }
+        const glm::vec3 centre = (lo + hi) * 0.5f;
+        float r2 = 0.0f;
+        for (const Vertex& v : vertices) {
+            const glm::vec3 d = v.position - centre;
+            r2 = glm::max(r2, glm::dot(d, d));
+        }
+        mBoundingSphere_ = glm::vec4(centre, std::sqrt(r2));
+    }
 }
 
 // Move constructor
@@ -164,6 +207,7 @@ Mesh::Mesh(Mesh&& other) noexcept
     mIndexBuffer_ = other.mIndexBuffer_;
     mIndexBufferMemory_ = other.mIndexBufferMemory_;
     mIndicesCount_ = other.mIndicesCount_;
+    mBoundingSphere_ = other.mBoundingSphere_;
 
     // Null out other's handles
     other.mVertexBuffer_ = nullptr;
@@ -180,6 +224,8 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept {
         mVertexBufferMemory_ = other.mVertexBufferMemory_;
         mIndexBuffer_ = other.mIndexBuffer_;
         mIndexBufferMemory_ = other.mIndexBufferMemory_;
+        mIndicesCount_ = other.mIndicesCount_;   // (finalize() above zeroed ours)
+        mBoundingSphere_ = other.mBoundingSphere_;
 
         other.mVertexBuffer_ = nullptr;
         other.mVertexBufferMemory_ = nullptr;

@@ -31,15 +31,19 @@ void Material::pushConstants(vk::CommandBuffer cmdBuffer, const void* data, uint
 }
 
 // move constructor
-Material::Material(Material&& other) 
+Material::Material(Material&& other)
     : mGraphicsContext_(other.mGraphicsContext_),
       mPipelineResource_(other.mPipelineResource_),
-      mDescriptorSet_(other.mDescriptorSet_) {}
+      mDescriptorSet_(other.mDescriptorSet_),
+      mInstancedVariant_(other.mInstancedVariant_),
+      mHasInstancedVariant_(other.mHasInstancedVariant_) {}
 
 // move assignment
 Material& Material::operator=(Material&& other) noexcept {
     if (this != &other) {
         mDescriptorSet_ = other.mDescriptorSet_;
+        mInstancedVariant_ = other.mInstancedVariant_;
+        mHasInstancedVariant_ = other.mHasInstancedVariant_;
     }
     return *this;
 }
@@ -55,7 +59,7 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
         .descriptorSetCount = 1,
         .pSetLayouts = &((vk::DescriptorSetLayout&)mPipelineResource_.getDescriptorSetLayout()),
     };
-    
+
     if (mGraphicsContext_.getDevice().allocateDescriptorSets(&allocInfo, &mDescriptorSet_) != vk::Result::eSuccess) {
         throw std::runtime_error("failed to allocate descriptor sets!");
     }
@@ -63,7 +67,7 @@ void Material::createDescriptorSet(const MaterialConfig& config) {
     std::vector<vk::WriteDescriptorSet> descriptorWrites;
     std::vector<vk::DescriptorBufferInfo> bufferInfos;
     std::vector<vk::DescriptorImageInfo> imageInfos;
-    
+
     // Reserve space to prevent reallocation which would invalidate pointers
     bufferInfos.reserve(config.bufferBindings.size());
     imageInfos.reserve(config.imageBindings.size() + config.imageArrayBindings.size());
@@ -147,6 +151,12 @@ vk::DescriptorSetLayout Material::getDescriptorSetLayout() const {
 
 const vk::DescriptorSet& Material::getDescriptorSet() const {
     return mDescriptorSet_;
+}
+
+void Material::freeDescriptorSet() {
+    if (!mDescriptorSet_) return;
+    (void)mGraphicsContext_.getDevice().freeDescriptorSets(mGraphicsContext_.mDescriptorPool_, 1, &mDescriptorSet_);
+    mDescriptorSet_ = nullptr;
 }
 
 } // namespace clay

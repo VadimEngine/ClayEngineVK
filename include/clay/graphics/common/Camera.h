@@ -146,6 +146,12 @@ public:
 
     float getFar() const;
 
+    /** Set the near clip plane distance */
+    void setNear(float newNear);
+
+    /** Set the far clip plane distance */
+    void setFar(float newFar);
+
 private:
     /** Update the forward, Right and Up vector based on the camera's rotation*/
     void updateCameraVectors();

@@ -4,8 +4,11 @@
 #include <stdio.h>
 #include <string>
 
-// Define the global flag for enabling/disabling logs
+// Logs are on unless the build defines CLAY_NO_LOGS (e.g. a game's Release config:
+// target_compile_definitions(ClayEngineVK PUBLIC $<$<CONFIG:Release>:CLAY_NO_LOGS>)).
+#ifndef CLAY_NO_LOGS
 #define PRINT_GLOBAL
+#endif
 
 #if defined(CLAY_PLATFORM_XR) || defined(CLAY_PLATFORM_ANDROID)
 // Android platform logging
@@ -49,11 +52,11 @@
 }
 
 #else
-// If PRINT_GLOBAL is not defined, disable logs
-#define LOG_I(...) // No log
-#define LOG_IV(...) // No log
-#define LOG_W(...) // No log
-#define LOG_E(...) // No log
+// If PRINT_GLOBAL is not defined, disable logs (the arguments are not evaluated).
+#define LOG_I(...) ((void)0)
+#define LOG_IV(...) ((void)0)
+#define LOG_W(...) ((void)0)
+#define LOG_E(...) ((void)0)
 #endif // PRINT_GLOBAL
 
 #endif // #ifdef CLAY_PLATFORM_XR

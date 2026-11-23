@@ -466,65 +466,65 @@ void CollisionSystem::constrainVelocitiesForPredictedCollisions(EntityManager& e
 }
 
 void CollisionSystem::resolveOverlappingCollisions(EntityManager& entityManager, int maxIterations) {
-    bool hadCollision = true;
-    
-    for (int iteration = 0; iteration < maxIterations && hadCollision; ++iteration) {
-        hadCollision = false;
-        
-        std::vector<Entity> physicsEntities;
-        for (Entity e : entityManager.mCurrentEntities_) {
-            if (entityManager.mSignatures[e][ComponentType::TRANSFORM] &&
-                entityManager.mSignatures[e][ComponentType::PHYSICS_BODY_2D] &&
-                entityManager.mSignatures[e][ComponentType::COLLIDER]) {
-                physicsEntities.push_back(e);
-            }
+    // Collect solid 2D physics entities once (membership doesn't change between passes).
+    std::vector<Entity> physicsEntities;
+    for (Entity e : entityManager.mCurrentEntities_) {
+        if (entityManager.mSignatures[e][ComponentType::METADATA] && !entityManager.mMetaData[e].enabled)
+            continue;
+        if (entityManager.mSignatures[e][ComponentType::TRANSFORM] &&
+            entityManager.mSignatures[e][ComponentType::PHYSICS_BODY_2D] &&
+            entityManager.mSignatures[e][ComponentType::COLLIDER]) {
+            physicsEntities.push_back(e);
         }
+    }
 
-        // Check all pairs and resolve any collision found
+    // A dynamic body can overlap several tiles at once (e.g. standing across a tile
+    // seam), so every overlapping pair must be separated each frame - resolving just
+    // one lets the rest accumulate and the body sinks through. Separate all pairs per
+    // pass and repeat until nothing overlaps (or we hit the iteration cap).
+    for (int iteration = 0; iteration < maxIterations; ++iteration) {
+        bool hadCollision = false;
+
         for (size_t i = 0; i < physicsEntities.size(); ++i) {
             for (size_t j = i + 1; j < physicsEntities.size(); ++j) {
                 Entity entityA = physicsEntities[i];
                 Entity entityB = physicsEntities[j];
 
-                auto& transformA = entityManager.mTransforms[entityA];
-                auto& transformB = entityManager.mTransforms[entityB];
                 auto& bodyA = entityManager.mPhysicsBodies2D[entityA];
                 auto& bodyB = entityManager.mPhysicsBodies2D[entityB];
+
+                // Nothing to separate: two static bodies, a trigger, or a non-solid.
+                if (bodyA.type == PhysicsBody2D::Type::STATIC &&
+                    bodyB.type == PhysicsBody2D::Type::STATIC) continue;
+                if (bodyA.isTrigger || bodyB.isTrigger) continue;
+                if (!bodyA.isSolid && !bodyB.isSolid) continue;
+
                 auto& colliderA = entityManager.mColliders[entityA];
                 auto& colliderB = entityManager.mColliders[entityB];
+                if (colliderA.mType_ != Collider::Type::AABB ||
+                    colliderB.mType_ != Collider::Type::AABB) continue;
 
-                if (bodyA.type == PhysicsBody2D::Type::STATIC && 
-                    bodyB.type == PhysicsBody2D::Type::STATIC) {
-                    continue;
-                }
+                auto& transformA = entityManager.mTransforms[entityA];
+                auto& transformB = entityManager.mTransforms[entityB];
 
-                if (colliderA.mType_ == Collider::Type::AABB && 
-                    colliderB.mType_ == Collider::Type::AABB) {
-                    
-                    glm::vec2 penetration;
-                    glm::vec3 worldHalfExtentsA = colliderA.aabb.halfExtents * transformA.mScale_;
-                    glm::vec3 worldHalfExtentsB = colliderB.aabb.halfExtents * transformB.mScale_;
-                    if (checkAABBCollision(
+                glm::vec3 worldHalfExtentsA = colliderA.aabb.halfExtents * transformA.mScale_;
+                glm::vec3 worldHalfExtentsB = colliderB.aabb.halfExtents * transformB.mScale_;
+
+                glm::vec2 penetration;
+                if (checkAABBCollision(
                         transformA.mPosition_ + colliderA.offset,
                         glm::vec3(worldHalfExtentsA.x, worldHalfExtentsA.y, 0.0f),
                         transformB.mPosition_ + colliderB.offset,
                         glm::vec3(worldHalfExtentsB.x, worldHalfExtentsB.y, 0.0f),
                         penetration)) {
-                        
-                        hadCollision = true;
-                        
-                        if (!bodyA.isTrigger && !bodyB.isTrigger) {
-                            // Apply MTV to separate overlapping objects
-                            resolveCollision2D(transformA, bodyA, transformB, bodyB, penetration);
-                            
-                            // Break inner loops to restart collision check from beginning
-                            i = physicsEntities.size();
-                            j = physicsEntities.size();
-                        }
-                    }
+                    // Apply MTV right away so later pairs this pass see the updated pose.
+                    resolveCollision2D(transformA, bodyA, transformB, bodyB, penetration);
+                    hadCollision = true;
                 }
             }
         }
+
+        if (!hadCollision) break; // fully separated
     }
 }
 

@@ -164,8 +164,9 @@ namespace clay::ecs {
             transform.mPosition_.y += body.velocity.y * dt;
         }
 
-        // Fourth pass: Resolve any remaining collisions until no overlaps remain
-        collisionSystem.resolveOverlappingCollisions(entityManager, 1);
+        // Fourth pass: Resolve any remaining overlaps. Several passes let a body resting
+        // across multiple tiles settle in one frame instead of sinking through.
+        collisionSystem.resolveOverlappingCollisions(entityManager, 8);
     }
 
 

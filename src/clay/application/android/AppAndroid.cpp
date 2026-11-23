@@ -6,6 +6,8 @@
 // clay
 #include "clay/application/android/AppAndroid.h"
 #include "clay/gui/android/ImGuiComponentAndroid.h"
+#include "clay/gui/android/UiComponentAndroid.h"
+#include "clay/application/common/Resources.h"
 #include "clay/utils/common/Utils.h"
 
 namespace clay {
@@ -13,14 +15,22 @@ namespace clay {
 AppAndroid::AppAndroid(android_app* app)
     : BaseApp(new GraphicsContextAndroid(app)),
       mAndroidNativeApp_(app) {
+    // Files come from the APK's assets unless the app sets another loader.
+    Resources::setFileLoader([this](const std::string& path) { return loadFileToMemory(path); });
+    mLastTime_ = std::chrono::steady_clock::now();
+    mStartTime_ = mLastTime_;
     ImGuiComponentAndroid::initialize(app, mpGraphicsContext_.get());
+    // The game UI on RmlUi (no-op unless built with CLAY_ENABLE_RMLUI): views and fonts from
+    // the assets' ui folder.
+    UiComponentAndroid::initialize(app, mpGraphicsContext_.get(), "ui");
 }
 
 AppAndroid::~AppAndroid() {
     // delete both scenes before freeing other resources
     mSceneBuffer_[0].reset();
     mSceneBuffer_[1].reset();
-    
+
+    UiComponentAndroid::finalize();
     // Shutdown ImGui
     ImGuiComponentAndroid::finalize();
 }
@@ -28,18 +38,24 @@ AppAndroid::~AppAndroid() {
 void AppAndroid::loadResources() {}
 
 void AppAndroid::update() {
-    std::chrono::duration<float> dt = (std::chrono::steady_clock::now() - mLastTime_);
-    mLastTime_ = std::chrono::steady_clock::now();
+    const auto now = std::chrono::steady_clock::now();
+    // Clamped like the desktop app: a long stall (the app in the background, a slow first
+    // frame) must not throw the simulation forward.
+    const float dtSeconds = std::min(std::chrono::duration<float>(now - mLastTime_).count(), 0.1f);
+    mLastTime_ = now;
 
     if (mSceneBuffer_[1]) {
         vkDeviceWaitIdle(mpGraphicsContext_->getDevice()); // wait to allow deleting current scene
         // switch to scene in back buffer
         mSceneBuffer_[0] = std::move(mSceneBuffer_[1]);
+        // Initialize the new scene (as AppDesktop does).
+        mSceneBuffer_[0]->initialize();
     }
 
     if (mSceneBuffer_[0] != nullptr) {
-        mSceneBuffer_[0]->update(dt.count());
+        mSceneBuffer_[0]->update(dtSeconds);
     }
+    UiComponentAndroid::update(std::chrono::duration<double>(now - mStartTime_).count());
 }
 
 void AppAndroid::render() {
@@ -70,6 +86,7 @@ void AppAndroid::render() {
     }
 
     mpGraphicsContext_->getDevice().resetFences(1, &((GraphicsContextAndroid*)mpGraphicsContext_.get())->mInFlightFences_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_]);
+    mpGraphicsContext_->beginFrame(((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_);
 
     vkResetCommandBuffer(((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCommandBuffers_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_], /*VkCommandBufferResetFlagBits*/ 0);
     recordCommandBuffer(((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCommandBuffers_[((GraphicsContextAndroid*)mpGraphicsContext_.get())->mCurrentFrame_], imageIndex);
@@ -132,6 +149,9 @@ void AppAndroid::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t ima
         throw std::runtime_error("failed to begin recording command buffer!");
     }
 
+    // The UI's offscreen work (app-filled images) goes before the main pass.
+    UiComponentAndroid::renderOffscreen(commandBuffer);
+
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = mpGraphicsContext_->mRenderPass_;
@@ -165,6 +185,8 @@ void AppAndroid::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t ima
         if (mSceneBuffer_[0] != nullptr) {
             mSceneBuffer_[0]->render(commandBuffer);
         }
+        // The game UI over the scene.
+        UiComponentAndroid::render(commandBuffer);
     }
     vkCmdEndRenderPass(commandBuffer);
 
@@ -184,11 +206,21 @@ utils::FileData AppAndroid::loadFileToMemory(const std::filesystem::path& filePa
     if (!asset) {
         throw std::runtime_error("Failed to open asset: " + filePath.string());
     }
-    size_t fileSize = AAsset_getLength(asset);
+    const size_t fileSize = static_cast<size_t>(AAsset_getLength(asset));
 
+    // AAsset_read may return less than asked (large compressed assets come in pieces), so
+    // read until the whole file is in; a short read used to leave garbage in the buffer.
     auto buffer = std::make_unique<unsigned char[]>(fileSize);
-    AAsset_read(asset, buffer.get(), fileSize);
+    size_t got = 0;
+    while (got < fileSize) {
+        const int n = AAsset_read(asset, buffer.get() + got, fileSize - got);
+        if (n <= 0) break;
+        got += static_cast<size_t>(n);
+    }
     AAsset_close(asset);
+    if (got != fileSize) {
+        throw std::runtime_error("Short read of asset: " + filePath.string());
+    }
 
     return {std::move(buffer), static_cast<std::size_t>(fileSize)};
 }
@@ -250,8 +282,8 @@ InputHandlerAndroid& AppAndroid::getInputHandler() {
 }
 
 void AppAndroid::onWindowRecreated() {
-    // Force swapchain recreation when window is recreated
-    ((GraphicsContextAndroid*)mpGraphicsContext_.get())->recreateSwapChain(mAndroidNativeApp_);
+    // A new native window needs a new surface, not just a new swapchain.
+    ((GraphicsContextAndroid*)mpGraphicsContext_.get())->recreateSurface(mAndroidNativeApp_);
 }
 
 } // namespace clay

@@ -54,6 +54,12 @@ public:
     /** Get the current Gain */
     float getGain() const;
 
+    /**
+     * Set whether the audio source loops (e.g. for looping background music).
+     * @param loop True to loop until stopped.
+     */
+    void setLooping(bool loop);
+
     /** Clear the source buffer binding before cleanup */
     void clearSource();
 

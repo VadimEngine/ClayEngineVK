@@ -51,6 +51,12 @@ public:
     /** Get Gain of audio */
     float getGain() const;
 
+    /**
+     * Set whether this source loops its buffer.
+     * @param loop True to loop playback until stopped.
+     */
+    void setLooping(bool loop);
+
     /** Get the id of this Source */
     ALuint getId() const;
 

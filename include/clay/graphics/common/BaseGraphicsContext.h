@@ -14,10 +14,10 @@ public:
     virtual ~BaseGraphicsContext();
 
     void createBuffer(
-        vk::DeviceSize size, 
-        vk::BufferUsageFlags usage, 
+        vk::DeviceSize size,
+        vk::BufferUsageFlags usage,
         vk::MemoryPropertyFlags properties,
-        vk::Buffer& buffer, 
+        vk::Buffer& buffer,
         vk::DeviceMemory& bufferMemory
     );
 
@@ -56,7 +56,17 @@ public:
 
     std::pair<int, int> getFrameDimensions() const;
 
+    // Frame bookkeeping for per-frame transient GPU data (e.g. instance buffers). The
+    // platform app calls beginFrame() once per rendered frame, after waiting on that
+    // frame slot's fence — so anything the slot's previous frame used is free again.
+    // A serial of 0 means the platform does not track frames (such data is then unused).
+    void beginFrame(uint32_t frameSlot) { mFrameSlot_ = frameSlot; ++mFrameSerial_; }
+    uint64_t getFrameSerial() const { return mFrameSerial_; }
+    uint32_t getFrameSlot() const { return mFrameSlot_; }
+
 protected:
+    uint64_t mFrameSerial_ = 0;
+    uint32_t mFrameSlot_ = 0;
     // initializer list instead
     vk::Device mDevice_ = nullptr;
     vk::Instance mInstance_ = nullptr;

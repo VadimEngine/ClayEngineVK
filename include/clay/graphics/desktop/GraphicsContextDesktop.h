@@ -6,6 +6,7 @@
 #include <vector>
 #include <array>
 #include <optional>
+#include <string>
 // third party
 #include <vulkan/vulkan.h>
 // clay
@@ -102,6 +103,34 @@ public:
 
     void createDepthResources();
 
+    // ---- Shadow mapping ----------------------------------------------------
+    // Offscreen depth target rendered from the light's point of view. A project
+    // creates a depth-only pipeline targeting getShadowRenderPass(), renders its
+    // shadow casters into it (between beginShadowRenderPass / endShadowRenderPass),
+    // then binds getShadowMapImageView()/Sampler() + the light uniform to its lit
+    // materials and samples the map to shade. All optional: unused by default.
+    static constexpr uint32_t SHADOW_MAP_SIZE = 2048;
+    void createShadowResources();
+    void beginShadowRenderPass(vk::CommandBuffer cmdBuffer);
+    void endShadowRenderPass(vk::CommandBuffer cmdBuffer);
+    vk::RenderPass getShadowRenderPass() const { return mShadowRenderPass_; }
+    vk::ImageView  getShadowMapImageView() const { return mShadowImageView_; }
+    vk::Sampler    getShadowMapSampler() const { return mShadowSampler_; }
+    uint32_t       getShadowMapSize() const { return SHADOW_MAP_SIZE; }
+    UniformBuffer* getLightUniform() const { return mLightUniform_.get(); }
+
+    // --- Frame capture ---
+    // Saves a finished frame (exactly what is presented, UI included) as a PNG, read
+    // back from the swapchain image, so it works with the window hidden or covered.
+    // requestCapture() queues it; AppDesktop::presentFrame takes it on the next frame.
+    void requestCapture(const std::string& path) { mCapturePath_ = path; }
+    bool capturePending() const { return !mCapturePath_.empty(); }
+    // Number of captures finished so far (successful or not).
+    uint32_t captureCount() const { return mCaptureCount_; }
+    // Reads swapchain image `imageIndex` (which must be fully rendered and in the
+    // present layout) into the pending capture path. Returns false on failure.
+    bool captureSwapchainImage(uint32_t imageIndex);
+
     void createSyncObjects();
 
     void cleanUp();
@@ -138,6 +167,19 @@ public:
     std::vector<vk::Fence> mInFlightFences_;
     std::unique_ptr<UniformBuffer> mCameraUniform_;
     std::unique_ptr<UniformBuffer> mCameraUniformHeadLocked_;
+
+    // Shadow-map resources (see createShadowResources()).
+    vk::Image        mShadowImage_;
+    vk::DeviceMemory mShadowImageMemory_;
+    vk::ImageView    mShadowImageView_;
+    vk::Sampler      mShadowSampler_;
+    vk::RenderPass   mShadowRenderPass_ = nullptr;
+    vk::Framebuffer  mShadowFramebuffer_ = nullptr;
+    vk::Format       mShadowDepthFormat_ = vk::Format::eD32Sfloat;
+    std::unique_ptr<UniformBuffer> mLightUniform_; // light-space view*proj (mat4)
+
+    std::string mCapturePath_;      // pending frame capture ("" = none)
+    uint32_t mCaptureCount_ = 0;
 
     Window& mWindow_; // todo remove this
     bool mVSyncEnabled_;

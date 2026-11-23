@@ -1,6 +1,8 @@
 #include "clay/ecs/EntityManager.h"
 #include "clay/graphics/common/Tilemap.h"
 #include <clay/utils/common/Logger.h>
+#include <clay/utils/common/Profiler.h>
+#include <cstring>
 
 namespace clay::ecs {
 
@@ -50,6 +52,7 @@ void EntityManager::destroyEntity(Entity entity) {
     
     if (mSignatures[entity][ComponentType::SKELETAL_ANIMATION_RENDERABLE]) {
         auto& animRenderable = mAnimation3DRenderables[entity];
+        animRenderable.boneTransformsMapped_ = nullptr; // freeing the memory unmaps it
         if (animRenderable.boneTransformsBuffer_) {
             mGraphicsContext_.getDevice().destroyBuffer(animRenderable.boneTransformsBuffer_, nullptr);
             animRenderable.boneTransformsBuffer_ = nullptr;
@@ -124,10 +127,37 @@ void EntityManager::releasePhysicsActors() {
     }
 }
 
+void EntityManager::createBoneBuffer(Animation3DRenderable& anim, uint32_t maxBones) {
+    const vk::DeviceSize size = sizeof(glm::mat4) * maxBones;
+    mGraphicsContext_.createBuffer(
+        size,
+        vk::BufferUsageFlagBits::eUniformBuffer,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        anim.boneTransformsBuffer_,
+        anim.boneTransformsMemory_
+    );
+    anim.boneTransformsMapped_ = mGraphicsContext_.getDevice().mapMemory(anim.boneTransformsMemory_, 0, size);
+
+    glm::mat4* palette = static_cast<glm::mat4*>(anim.boneTransformsMapped_);
+    for (uint32_t i = 0; i < maxBones; ++i) palette[i] = glm::mat4(1.0f);
+}
+
+void EntityManager::uploadBones(Animation3DRenderable& anim, const glm::mat4* bones, size_t count) {
+    if (!anim.boneTransformsMemory_ || count == 0) return;
+    if (!anim.boneTransformsMapped_) {
+        // Buffer created by the app directly: map it once and keep it mapped.
+        anim.boneTransformsMapped_ =
+            mGraphicsContext_.getDevice().mapMemory(anim.boneTransformsMemory_, 0, VK_WHOLE_SIZE);
+    }
+    if (count > kMaxBones) count = kMaxBones;
+    std::memcpy(anim.boneTransformsMapped_, bones, sizeof(glm::mat4) * count);
+}
+
 void EntityManager::releaseBoneBuffers() {
     for (Entity e : mCurrentEntities_) {
         if (mSignatures[e].test(ComponentType::SKELETAL_ANIMATION_RENDERABLE)) {
             auto& animRenderable = mAnimation3DRenderables[e];
+            animRenderable.boneTransformsMapped_ = nullptr; // freeing the memory unmaps it
             if (animRenderable.boneTransformsBuffer_) {
                 mGraphicsContext_.getDevice().destroyBuffer(animRenderable.boneTransformsBuffer_, nullptr);
                 animRenderable.boneTransformsBuffer_ = nullptr;
@@ -145,9 +175,10 @@ void EntityManager::render(vk::CommandBuffer cmdBuffer) {
 }
 
 void EntityManager::update(float dt) {
-    mPhysicsSystem_.update(*this, dt);
-    mCollisionSystem_.update(*this, dt); // TODO optimize this bottleneck
-    mRenderSystem_.update(*this, dt);
+    { CLAY_PROFILE_SCOPE("    ECS physics");   mPhysicsSystem_.update(*this, dt); }
+    { CLAY_PROFILE_SCOPE("    ECS collision"); mCollisionSystem_.update(*this, dt); }
+    { CLAY_PROFILE_SCOPE("    ECS anim2d");    mRenderSystem_.update(*this, dt); }
+    CLAY_PROFILE_COUNT("Entities", mCurrentEntities_.size());
 }
 
 void EntityManager::setSkybox(clay::Handle<Mesh> meshHandle, clay::Handle<Material> materialHandle) {

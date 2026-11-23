@@ -866,6 +866,27 @@ void GraphicsContextAndroid::recreateSwapChain(android_app* pAndroidApp) {
     createFramebuffers();
 }
 
+void GraphicsContextAndroid::recreateSurface(android_app* pAndroidApp) {
+    mDevice_.waitIdle();
+    cleanupSwapChain();
+    mInstance_.destroySurfaceKHR(mSurface_, nullptr);
+
+    VkAndroidSurfaceCreateInfoKHR createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+    createInfo.window = pAndroidApp->window;
+    VkSurfaceKHR surface;
+    if (vkCreateAndroidSurfaceKHR(static_cast<VkInstance>(mInstance_), &createInfo, nullptr, &surface) != VK_SUCCESS) {
+        throw std::runtime_error("vkCreateAndroidSurfaceKHR() failed");
+    }
+    mSurface_ = surface;
+
+    createSwapChain(pAndroidApp);
+    createImageViews();
+    createColorResources();
+    createDepthResources();
+    createFramebuffers();
+}
+
 void GraphicsContextAndroid::cleanupSwapChain() {
     mDevice_.destroyImageView(mDepthImageView_, nullptr);
     mDevice_.destroyImage(mDepthImage_, nullptr);

@@ -10,6 +10,10 @@ BaseApp::~BaseApp() {};
 
 void BaseApp::loadResources() {}
 
+void BaseApp::loadResourcesWithProgress(const LoadProgressFn& /*report*/) {}
+
+void BaseApp::onResourcesLoaded() {}
+
 BaseGraphicsContext& BaseApp::getGraphicsContext() {
     return *mpGraphicsContext_;
 }

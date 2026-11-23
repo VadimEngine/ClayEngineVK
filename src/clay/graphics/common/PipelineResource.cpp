@@ -9,7 +9,9 @@ PipelineResource::PipelineResource(const PipelineConfig& config)
     : mGraphicsContext_(config.graphicsContext),
       mPipelineLayout_(nullptr),
       mPipeline_(nullptr),
-      mDescriptorSetLayout_(nullptr) {
+      mDescriptorSetLayout_(nullptr),
+      mDepthTestedAndWritten_(config.pipelineLayoutInfo.depthStencilState.depthTestEnable &&
+                              config.pipelineLayoutInfo.depthStencilState.depthWriteEnable) {
     createDescriptorSetLayout(config);
     createPipeline(config);
 }
@@ -20,6 +22,7 @@ PipelineResource::PipelineResource(PipelineResource&& other)
     mPipelineLayout_ = other.mPipelineLayout_;
     mPipeline_ = other.mPipeline_;
     mDescriptorSetLayout_ = other.mDescriptorSetLayout_;
+    mDepthTestedAndWritten_ = other.mDepthTestedAndWritten_;
 
     other.mPipelineLayout_ = nullptr;
     other.mPipeline_ = nullptr;
@@ -33,6 +36,7 @@ PipelineResource& PipelineResource::operator=(PipelineResource&& other) noexcept
         mPipelineLayout_ = other.mPipelineLayout_;
         mPipeline_ = other.mPipeline_;
         mDescriptorSetLayout_ = other.mDescriptorSetLayout_;
+        mDepthTestedAndWritten_ = other.mDepthTestedAndWritten_;
 
         other.mPipelineLayout_ = nullptr;
         other.mPipeline_ = nullptr;
@@ -66,9 +70,16 @@ void PipelineResource::createDescriptorSetLayout(const PipelineConfig& config) {
 }
 
 void PipelineResource::createPipeline(const PipelineConfig& config) {
+    std::vector<vk::VertexInputBindingDescription> vertexBindings{
+        config.pipelineLayoutInfo.vertexInputBindingDescription
+    };
+    vertexBindings.insert(vertexBindings.end(),
+                          config.pipelineLayoutInfo.extraVertexBindings.begin(),
+                          config.pipelineLayoutInfo.extraVertexBindings.end());
+
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
-        .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions = &config.pipelineLayoutInfo.vertexInputBindingDescription,
+        .vertexBindingDescriptionCount = static_cast<uint32_t>(vertexBindings.size()),
+        .pVertexBindingDescriptions = vertexBindings.data(),
         .vertexAttributeDescriptionCount = static_cast<uint32_t>(config.pipelineLayoutInfo.attributeDescriptions.size()),
         .pVertexAttributeDescriptions = config.pipelineLayoutInfo.attributeDescriptions.data(),
     };
@@ -90,20 +101,22 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
 
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{
         .blendEnable = true,
-        .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
-        .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+        // Colour blend factors are configurable (default: standard src-alpha over)
+        // so e.g. an additive-bloom pipeline can request eOne / eOne.
+        .srcColorBlendFactor = config.pipelineLayoutInfo.srcColorBlendFactor,
+        .dstColorBlendFactor = config.pipelineLayoutInfo.dstColorBlendFactor,
         .colorBlendOp = vk::BlendOp::eAdd,
         .srcAlphaBlendFactor = vk::BlendFactor::eOne,
         .dstAlphaBlendFactor = vk::BlendFactor::eZero,
         .alphaBlendOp = vk::BlendOp::eAdd,
-        .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+        .colorWriteMask = config.pipelineLayoutInfo.colorWriteMask,
     };
 
     vk::PipelineColorBlendStateCreateInfo colorBlending{
         .logicOpEnable = false,
         .logicOp = vk::LogicOp::eCopy,
-        .attachmentCount = 1,
-        .pAttachments = &colorBlendAttachment,
+        .attachmentCount = config.pipelineLayoutInfo.colorAttachmentCount,
+        .pAttachments = config.pipelineLayoutInfo.colorAttachmentCount > 0 ? &colorBlendAttachment : nullptr,
         .blendConstants = vk::ArrayWrapper1D<float, 4>({ 0.0f, 0.0f, 0.0f, 0.0f })
     };
 
@@ -148,7 +161,9 @@ void PipelineResource::createPipeline(const PipelineConfig& config) {
         .pColorBlendState = &colorBlending,
         .pDynamicState = &dynamicState,
         .layout = mPipelineLayout_,
-        .renderPass = mGraphicsContext_.mRenderPass_,
+        .renderPass = config.pipelineLayoutInfo.renderPassOverride
+                          ? config.pipelineLayoutInfo.renderPassOverride
+                          : mGraphicsContext_.mRenderPass_,
         .subpass = 0,
         .basePipelineHandle = nullptr
     };

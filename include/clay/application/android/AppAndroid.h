@@ -58,6 +58,7 @@ public:
     std::array<std::unique_ptr<BaseScene>, 2> mSceneBuffer_;
 
     std::chrono::steady_clock::time_point mLastTime_;
+    std::chrono::steady_clock::time_point mStartTime_;
 
     android_app* mAndroidNativeApp_;
 

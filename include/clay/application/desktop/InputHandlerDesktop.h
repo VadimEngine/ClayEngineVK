@@ -80,6 +80,16 @@ public:
     /** */
     std::optional<KeyEvent> getKeyEvent();
 
+    /** Queue a typed character (Unicode codepoint) from the OS text-input callback. */
+    void onCharInput(unsigned int codepoint);
+
+    /** Pop the next typed character, if any (for forwarding to a text UI). */
+    std::optional<unsigned int> getCharEvent();
+
+    /** Discard any queued key/char events (e.g. before focusing a text field, so keys
+     *  pressed earlier during gameplay don't get typed into it). */
+    void clearQueuedInput();
+
     bool isMouseButtonPressed(MouseEvent::Button button);
 
     std::optional<MouseEvent> getMouseEvent();
@@ -97,7 +107,7 @@ public:
 private:
     /** Helper method to keep keyBuffer within the size limit */
     template<typename T>
-    void trimBuffer(T eventQueue);
+    void trimBuffer(T& eventQueue);
 
     /** Number of key codes to check status of*/
     static constexpr unsigned int kKeys = 512;
@@ -108,6 +118,8 @@ private:
     std::bitset<kKeys> mKeyStates_;
     /** Queue of key events to use for single updates on a key event */
     std::queue<KeyEvent> mKeyEventQueue_;
+    /** Queue of typed characters (Unicode codepoints) for text input */
+    std::queue<unsigned int> mCharEventQueue_;
 
     /** Current mouse position */
     glm::ivec2 mMousePosition_;

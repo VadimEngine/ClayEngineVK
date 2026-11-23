@@ -77,6 +77,13 @@ struct ModelRenderable {
     glm::vec4 mColor_ = {1,1,1,1};
     glm::mat4 localModelMat = glm::identity<glm::mat4>();
     int renderLayer = 0; // Lower values render first: -100=skybox, 0=default, 100=UI
+    // When true the global world tint (e.g. day/night darkening) is NOT applied to this
+    // entity's colour — used for UI-like overlays such as the build-placement ghost.
+    bool mIgnoreWorldTint_ = false;
+    // Instances per draw (the vertex shader tells them apart by gl_InstanceIndex). Used
+    // by effects that stamp the same mesh several times, e.g. a screen-space outline.
+    // Only honoured on materials without an instanced variant.
+    uint32_t instanceCount = 1;
 };
 
 struct SpriteRenderable {
@@ -113,6 +120,19 @@ struct Animation3DRenderable {
     // Bone transforms buffer (shared)
     vk::Buffer boneTransformsBuffer_{};
     vk::DeviceMemory boneTransformsMemory_{};
+    // Persistent mapping of boneTransformsMemory_ (see EntityManager::createBoneBuffer /
+    // uploadBones) so a pose upload is a plain memcpy, not a map/unmap per frame.
+    void* boneTransformsMapped_ = nullptr;
+
+    // App-side visibility: when false the entity is not drawn (e.g. the game culled it
+    // against the camera). Skinned bounds depend on the pose, so the engine leaves
+    // this decision to the app rather than culling skinned meshes itself.
+    bool visible = true;
+
+    // Draw order, as ModelRenderable::renderLayer (lower first, 0 = the world).
+    int renderLayer = 0;
+    // Instances per draw, as ModelRenderable::instanceCount.
+    uint32_t instanceCount = 1;
     
     // Per-entity playback state
     float currentTime = 0.0f;

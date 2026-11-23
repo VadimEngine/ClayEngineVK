@@ -72,6 +72,12 @@ float AudioManager::getGain() const {
     }
 }
 
+void AudioManager::setLooping(bool loop) {
+    if (mAudioInitialized_) {
+        mpSoundSource_->setLooping(loop);
+    }
+}
+
 void AudioManager::clearSource() {
     if (mAudioInitialized_ && mpSoundSource_) {
         alSourceStop(mpSoundSource_->getId());

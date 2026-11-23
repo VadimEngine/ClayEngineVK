@@ -46,12 +46,24 @@ public:
     };
 
     SkeletalAnimation();
-    
+
+    // Load every animation clip contained in an FBX (an FBX can hold several named
+    // takes, e.g. walk / idle_loop / kneel_action / Death01). Each clip's name is
+    // the FBX animation-stack name. The mesh is loaded separately via
+    // AnimatedMesh::loadFromFBX; set it on each clip's SkeletalAnimation.
+    static std::vector<AnimationClip> loadClipsFromFBX(const std::string& filePath);
+
     void setAnimationClip(const AnimationClip& clip);
     void setMesh(const AnimatedMesh* mesh);
     
     // Update animation and return bone transforms
     std::vector<glm::mat4> update(float deltaTime);
+
+    // Evaluate the pose at `timeSeconds` into `out` (resized to the mesh's bone count).
+    // Does not touch the playback state, so one clip can be shared by many entities each
+    // tracking its own time. Prefer this over setTime()+update(): it reuses the caller's
+    // buffer (no per-frame allocation) and uses the precomputed bone/channel binding.
+    void evaluate(float timeSeconds, std::vector<glm::mat4>& out) const;
     
     void play();
     void pause();
@@ -84,6 +96,21 @@ public:
     const AnimatedMesh* mpMesh_ = nullptr;
     AnimationClip mClip_;
     std::map<std::string, int> mBoneChannelMap_;  // boneName -> channel index
+
+private:
+    // Clip<->skeleton binding, rebuilt lazily when the mesh or clip changes: the
+    // channel driving each bone, and the bones in parent-before-child order, so a
+    // pose is one linear pass with no name lookups or child searches.
+    struct BoneBinding {
+        int bone = -1;     // index into the mesh's bones
+        int parent = -1;   // parent bone index (-1 = root)
+        int channel = -1;  // index into mClip_.channels (-1 = not animated)
+    };
+    void rebuildBinding() const;
+    mutable std::vector<BoneBinding> mBinding_;
+    mutable bool mBindingDirty_ = true;
+
+public:
     
     float mCurrentTime_ = 0.0f;
     bool mIsPlaying_ = false;

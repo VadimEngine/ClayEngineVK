@@ -10,6 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Option to build tests (default OFF so users don't build them)
 option(CLAYENGINE_BUILD_TESTS "Build ClayEngineVK tests" OFF)
 
+# Option to build a game's permanent UI (menus, HUD) on RmlUi (thirdparty/RmlUi submodule,
+# MIT): UiComponentDesktop / clay::uibridge, implemented by
+# src/clay/gui/desktop/RmlUiRenderBridge.cpp. OFF by default: the UI functions are then no-ops.
+option(CLAY_ENABLE_RMLUI "Build the game UI on RmlUi (thirdparty/RmlUi)" OFF)
+
 # Assimp, sndfile, glfw
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 # assimp
@@ -238,12 +243,40 @@ if(CLAY_PLATFORM_XR)
 endif()
 if(CLAY_PLATFORM_ANDROID)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_ANDROID)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC _DEBUG)
+    # PhysX needs exactly one of _DEBUG / NDEBUG: optimised configs already define NDEBUG.
+    target_compile_definitions(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:_DEBUG>)
 endif()
 if(CLAY_PLATFORM_DESKTOP)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_DESKTOP)
     target_compile_definitions(${PROJECT_NAME} PUBLIC PX_PHYSX_STATIC_LIB)
 endif()
+
+# ---------------------------------------------------------------------------
+# RmlUi (optional, desktop + Android / Vulkan): HTML/CSS-like UI, statically linked, using the engine's
+# FreeType. The Vulkan renderer for it is the engine's own (RmlUiRenderBridge.cpp).
+# ---------------------------------------------------------------------------
+if(CLAY_ENABLE_RMLUI AND (CLAY_PLATFORM_DESKTOP OR CLAY_PLATFORM_ANDROID))
+    if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/RmlUi/CMakeLists.txt)
+        message(FATAL_ERROR "CLAY_ENABLE_RMLUI=ON but thirdparty/RmlUi is missing (git submodule update --init thirdparty/RmlUi).")
+    endif()
+    # RmlUi looks for Freetype::Freetype; give it the in-tree build (and skip the system search).
+    if(NOT TARGET Freetype::Freetype)
+        add_library(Freetype::Freetype ALIAS freetype)
+    endif()
+    set(CMAKE_DISABLE_FIND_PACKAGE_Freetype TRUE)
+    set(RMLUI_FONT_ENGINE "freetype" CACHE STRING "" FORCE)
+    set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
+    set(RMLUI_PRECOMPILED_HEADERS OFF CACHE BOOL "" FORCE)
+    set(_clay_shared ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/RmlUi ${CMAKE_BINARY_DIR}/thirdparty/RmlUi EXCLUDE_FROM_ALL)
+    set(BUILD_SHARED_LIBS ${_clay_shared})
+    set(CMAKE_DISABLE_FIND_PACKAGE_Freetype FALSE)
+    target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::Core)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_ENABLE_RMLUI)
+    message(STATUS "RmlUi: enabled (thirdparty/RmlUi)")
+endif()
+
 
 # Build tests if requested
 if(CLAYENGINE_BUILD_TESTS)
