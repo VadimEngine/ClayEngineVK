@@ -3,6 +3,11 @@
 //clay
 #include "clay/utils/common/Logger.h"
 #include "clay/gui/xr/ImGuiComponentXR.h"
+#include "clay/gui/xr/UiComponentXR.h"
+#include <algorithm>
+#include <chrono>
+#include <array>
+#include <cmath>
 // class
 #include "clay/application/xr/AppXR.h"
 // third party
@@ -29,10 +34,19 @@ void AppXR::Run() {
     ImGuiComponentXR::initialize(mXRSystem_->mAndroidAppState_.nativeWindow);
     CreateResources();
 
+    bool wasActive = false;
     while (mXRSystem_->m_applicationRunning) {
         mXRSystem_->PollSystemEvents();
         mXRSystem_->PollEvents();
-        if (mXRSystem_->m_sessionRunning) {
+        // Render only while the session runs AND the activity is resumed. While the activity
+        // is paused the runtime makes xrWaitFrame return at once, so rendering then would
+        // spin the CPU/GPU flat out for frames nobody sees.
+        const bool active = mXRSystem_->m_sessionRunning && mXRSystem_->mAndroidAppState_.resumed;
+        if (active != wasActive) {
+            wasActive = active;
+            onSessionRunningChanged(active);
+        }
+        if (active) {
             RenderFrame();
         }
     }
@@ -178,102 +192,68 @@ bool AppXR::RenderLayer(XRSystem::RenderLayerInfo &renderLayerInfo) {
         {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}
     );
 
-    // TODO use real time
+    GraphicsContextXR& gfx = *mXRSystem_->mpGraphicsContext_;
+
+    // One command buffer and one submit per frame. BeginRendering() waits for the previous
+    // frame's GPU work - the only CPU wait in the frame - so everything below (scene
+    // switches, scene update writing uniforms/bone palettes, the camera uniforms) can safely
+    // rewrite data the GPU reads. The GPU then runs this frame while the CPU goes on to
+    // xrEndFrame / xrWaitFrame of the next one.
+    gfx.BeginRendering();
+    vk::CommandBuffer cmd = gfx.cmdBuffer;
+
     if (mScenes_.size() > 1) {
         mScenes_.erase(mScenes_.begin(), std::prev(mScenes_.end()));
         mScenes_.front()->initialize();
     }
-    mScenes_.front()->update(0);
-    // draw imgui onto a different frame buffer
+    // Real frame time (seconds, capped so a stall or a resume isn't one giant step).
+    float dt = 0.0f;
+    {
+        const auto now = std::chrono::steady_clock::now();
+        if (mLastFrameTime_.time_since_epoch().count() != 0) {
+            dt = std::min(std::chrono::duration<float>(now - mLastFrameTime_).count(), 0.1f);
+        }
+        mLastFrameTime_ = now;
+    }
+    mScenes_.front()->update(dt);
 
-    mXRSystem_->mpGraphicsContext_->getDevice().waitForFences(1, &mXRSystem_->mpGraphicsContext_->fence, true, UINT64_MAX);
-
-    mXRSystem_->mpGraphicsContext_->getDevice().resetFences(1, &mXRSystem_->mpGraphicsContext_->fence);
-
-    imguiCommandBuffer.reset({});
-
-    //vkResetCommandBuffer(imguiCommandBuffer, VkCommandBufferResetFlagBits(0));
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-    if (vkBeginCommandBuffer(imguiCommandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
+    // --- GUI panels: each drawn into its offscreen target (mips rebuilt), sampled below ---
+    if (mImguiPanelEnabled_) {
+        mImguiTarget_.begin(cmd);
+        mScenes_.front()->renderGUI(cmd);
+        mImguiTarget_.end(cmd);
     }
 
-    VkRenderPassBeginInfo renderPassBegin {};
-    renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBegin.pNext = nullptr;
-    renderPassBegin.renderPass = mXRSystem_->mpGraphicsContext_->imguiRenderPass;
-    renderPassBegin.framebuffer = imguiFrameBuffer;
-    renderPassBegin.renderArea.offset = {0, 0};
-    renderPassBegin.renderArea.extent.width = imguiWidth;
-    renderPassBegin.renderArea.extent.height = imguiHeight;
-    renderPassBegin.clearValueCount = 1;
-    VkClearValue clearColor = {0.0f,0.0f,0.0f,1.0f};
-    renderPassBegin.pClearValues = &clearColor;
-    vkCmdBeginRenderPass(imguiCommandBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
+    UiComponentXR::render(cmd); // the RmlUi panel, if one is loaded
 
-    mScenes_.front()->renderGUI(imguiCommandBuffer);
+    // --- Offscreen passes the scene needs before the main pass (e.g. a shadow map) ---------
+    mScenes_.front()->renderShadowPass(cmd);
 
-    vkCmdEndRenderPass(imguiCommandBuffer);
-    if (vkEndCommandBuffer(imguiCommandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
-    }
+    // --- Scene: both eyes in one multiview pass -------------------------------------------
+    // One layered swapchain (layer i = view i); see XRSystem::CreateSwapchains.
+    XRSystem::SwapchainInfo &colorSwapchainInfo = mXRSystem_->m_colorSwapchainInfos[0];
+    XRSystem::SwapchainInfo &depthSwapchainInfo = mXRSystem_->m_depthSwapchainInfos[0];
 
-    vk::PipelineStageFlags waitDstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    uint32_t colorImageIndex = 0;
+    uint32_t depthImageIndex = 0;
+    XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+    xrAcquireSwapchainImage(colorSwapchainInfo.swapchain, &acquireInfo, &colorImageIndex);
+    xrAcquireSwapchainImage(depthSwapchainInfo.swapchain, &acquireInfo, &depthImageIndex);
 
-    vk::SubmitInfo submitInfo;
-    submitInfo.pNext = nullptr;
-    submitInfo.waitSemaphoreCount = mXRSystem_->mpGraphicsContext_->acquireSemaphore ? 1 : 0;
-    submitInfo.pWaitSemaphores = mXRSystem_->mpGraphicsContext_->acquireSemaphore ? &mXRSystem_->mpGraphicsContext_->acquireSemaphore : nullptr;
-    submitInfo.pWaitDstStageMask = mXRSystem_->mpGraphicsContext_->acquireSemaphore ? &waitDstStageMask : nullptr;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &imguiCommandBuffer;
-    submitInfo.signalSemaphoreCount = mXRSystem_->mpGraphicsContext_->submitSemaphore ? 1 : 0;
-    submitInfo.pSignalSemaphores = mXRSystem_->mpGraphicsContext_->submitSemaphore ? &mXRSystem_->mpGraphicsContext_->submitSemaphore : nullptr;
+    XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+    waitInfo.timeout = XR_INFINITE_DURATION;
+    xrWaitSwapchainImage(colorSwapchainInfo.swapchain, &waitInfo);
+    xrWaitSwapchainImage(depthSwapchainInfo.swapchain, &waitInfo);
 
-    mXRSystem_->mpGraphicsContext_->mGraphicsQueue_.submit(submitInfo, mXRSystem_->mpGraphicsContext_->fence);
-    mXRSystem_->mpGraphicsContext_->getDevice().waitForFences(1, &mXRSystem_->mpGraphicsContext_->fence, true, UINT64_MAX);
+    const uint32_t width = mXRSystem_->mEyeWidth_;
+    const uint32_t height = mXRSystem_->mEyeHeight_;
 
-    mXRSystem_->mpGraphicsContext_->transitionImageLayout(
-        imguiImage,
-        vk::Format::eR8Unorm,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        vk::ImageLayout::eShaderReadOnlyOptimal,
-        1
-    );
-    // imgui end
-
-    // Per view in the view configuration:
-    for (uint32_t i = 0; i < viewCount; i++) {
-        XRSystem::SwapchainInfo &colorSwapchainInfo = mXRSystem_->m_colorSwapchainInfos[i];
-        XRSystem::SwapchainInfo &depthSwapchainInfo = mXRSystem_->m_depthSwapchainInfos[i];
-
-        // Acquire and wait for an image from the swapchains.
-        // Get the image index of an image in the swapchains.
-        // The timeout is infinite.
-        uint32_t colorImageIndex = 0;
-        uint32_t depthImageIndex = 0;
-        XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-        xrAcquireSwapchainImage(colorSwapchainInfo.swapchain, &acquireInfo, &colorImageIndex);
-        xrAcquireSwapchainImage(depthSwapchainInfo.swapchain, &acquireInfo, &depthImageIndex);
-
-        XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-        waitInfo.timeout = XR_INFINITE_DURATION;
-        xrWaitSwapchainImage(colorSwapchainInfo.swapchain, &waitInfo);
-        xrWaitSwapchainImage(depthSwapchainInfo.swapchain, &waitInfo);
-
-        // Get the width and height and construct the viewport and scissors.
-        const uint32_t &width = mXRSystem_->m_viewConfigurationViews[i].recommendedImageRectWidth;
-        const uint32_t &height = mXRSystem_->m_viewConfigurationViews[i].recommendedImageRectHeight;
-        clay::GraphicsContextXR::Viewport viewport = {0.0f, 0.0f, (float) width, (float) height, 0.0f, 1.0f};
-        clay::GraphicsContextXR::Rect2D scissor = {{(int32_t) 0, (int32_t) 0},
-                                                   {width,       height}};
-        float nearZ = 0.05f;
-        float farZ = 100.0f;
-
-        // Fill out the XrCompositionLayerProjectionView structure specifying the pose and fov from the view.
-        // This also associates the swapchain image with this layer projection view.
+    // Per-eye camera matrices, all written once; shaders pick theirs with gl_ViewIndex.
+    const Camera* pCamera = mScenes_.front()->getFocusCamera();
+    GraphicsContextXR::StereoCamera worldLockedUniform{};
+    GraphicsContextXR::StereoCamera headLockedUniform{};
+    const uint32_t stereoViews = std::min<uint32_t>(viewCount, 2);
+    for (uint32_t i = 0; i < stereoViews; i++) {
         renderLayerInfo.layerProjectionViews[i] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
         renderLayerInfo.layerProjectionViews[i].pose = views[i].pose;
         renderLayerInfo.layerProjectionViews[i].fov = views[i].fov;
@@ -282,67 +262,50 @@ bool AppXR::RenderLayer(XRSystem::RenderLayerInfo &renderLayerInfo) {
         renderLayerInfo.layerProjectionViews[i].subImage.imageRect.offset.y = 0;
         renderLayerInfo.layerProjectionViews[i].subImage.imageRect.extent.width = static_cast<int32_t>(width);
         renderLayerInfo.layerProjectionViews[i].subImage.imageRect.extent.height = static_cast<int32_t>(height);
-        renderLayerInfo.layerProjectionViews[i].subImage.imageArrayIndex = 0;  // Useful for multiview rendering.
+        renderLayerInfo.layerProjectionViews[i].subImage.imageArrayIndex = i; // this eye's layer
 
-        // Rendering code to clear the color and depth image views.
-        mXRSystem_->mpGraphicsContext_->BeginRendering();
-
-        if (mXRSystem_->m_environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_OPAQUE) {
-            // VR mode use a background color.
-            mXRSystem_->mpGraphicsContext_->ClearColor(
-                colorSwapchainInfo.imageViews[colorImageIndex], 0.17f, 0.17f, 0.17f, 1.00f
-            );
-        } else {
-            // In AR mode make the background color black.
-            mXRSystem_->mpGraphicsContext_->ClearColor(
-                colorSwapchainInfo.imageViews[colorImageIndex], 0.00f, 0.00f, 0.00f, 1.00f
-            );
-        }
-        mXRSystem_->mpGraphicsContext_->ClearDepth(depthSwapchainInfo.imageViews[depthImageIndex], 1.0f);
-
-        mXRSystem_->mpGraphicsContext_->SetRenderAttachments(
-            &colorSwapchainInfo.imageViews[colorImageIndex], 1,
-            depthSwapchainInfo.imageViews[depthImageIndex], width,
-            height
-        );
-        mXRSystem_->mpGraphicsContext_->SetViewports(&viewport, 1);
-        mXRSystem_->mpGraphicsContext_->SetScissors(&scissor, 1);
-
-        // Compute the view-projection transform.
-        const Camera* pCamera = mScenes_.front()->getFocusCamera();
-        const glm::mat4 glmProj = utils::computeProjectionMatrix(views[i].fov, pCamera->getNear(), pCamera->getFar());
-
-        const glm::mat4 glmViewWorldLocked = utils::computeWorldLockViewMatrix(
+        const glm::mat4 proj = utils::computeProjectionMatrix(views[i].fov, pCamera->getNear(), pCamera->getFar());
+        worldLockedUniform.view[i] = utils::computeWorldLockViewMatrix(
             views[i].pose,
             pCamera->getPosition(),
             pCamera->getOrientation(),
             mInputHandler_.getHeadPose()
         );
-        const glm::mat4 glmViewHeadLocked = utils::computeHeadLockViewMatrix(views[i].pose);
-
-        struct {
-            glm::mat4 view;
-            glm::mat4 proj;
-        } worldLockedUniform { glmViewWorldLocked, glmProj };
-
-        struct {
-            glm::mat4 view;
-            glm::mat4 proj;
-        } headLockedUniform { glmViewHeadLocked, glmProj };
-
-        mXRSystem_->mpGraphicsContext_->mWorldLockedCameraUniform_->setData(&worldLockedUniform, sizeof(worldLockedUniform));
-        mXRSystem_->mpGraphicsContext_->mHeadLockedCameraUniform_->setData(&headLockedUniform, sizeof(headLockedUniform));
-
-        mScenes_.front()->render(mXRSystem_->mpGraphicsContext_->cmdBuffer);
-
-        mXRSystem_->mpGraphicsContext_->EndRendering();
-        // Give the swapchain image back to OpenXR, allowing the compositor to use the image.
-        XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-        xrReleaseSwapchainImage(colorSwapchainInfo.swapchain, &releaseInfo);
-        xrReleaseSwapchainImage(depthSwapchainInfo.swapchain, &releaseInfo);
+        worldLockedUniform.proj[i] = proj;
+        mEyeViewProj_[i] = proj * worldLockedUniform.view[i];
+        headLockedUniform.view[i] = utils::computeHeadLockViewMatrix(views[i].pose);
+        headLockedUniform.proj[i] = proj;
     }
+    if (stereoViews == 1) mEyeViewProj_[1] = mEyeViewProj_[0];
+    gfx.mWorldLockedCameraUniform_->setData(&worldLockedUniform, sizeof(worldLockedUniform));
+    gfx.mHeadLockedCameraUniform_->setData(&headLockedUniform, sizeof(headLockedUniform));
+
+    // VR: a background color. AR (passthrough blend): black.
+    const std::array<float, 4> clearColor =
+        (mXRSystem_->m_environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_OPAQUE)
+            ? std::array<float, 4>{0.17f, 0.17f, 0.17f, 1.0f}
+            : std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
+
+    VkImageView colorView = colorSwapchainInfo.imageViews[colorImageIndex];
+    gfx.SetRenderAttachments(&colorView, 1, depthSwapchainInfo.imageViews[depthImageIndex],
+                             width, height, clearColor, 1.0f);
+
+    clay::GraphicsContextXR::Viewport viewport = {0.0f, 0.0f, (float) width, (float) height, 0.0f, 1.0f};
+    clay::GraphicsContextXR::Rect2D scissor = {{(int32_t) 0, (int32_t) 0}, {width, height}};
+    gfx.SetViewports(&viewport, 1);
+    gfx.SetScissors(&scissor, 1);
+
+    mScenes_.front()->render(cmd);
+
+    // Submit (no CPU wait), then hand the images back: the compositor's reads are ordered
+    // after our submission on the same queue.
+    gfx.EndRendering();
+    XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+    xrReleaseSwapchainImage(colorSwapchainInfo.swapchain, &releaseInfo);
+    xrReleaseSwapchainImage(depthSwapchainInfo.swapchain, &releaseInfo);
 
     // Fill out the XrCompositionLayerProjection structure for usage with xrEndFrame().
+    renderLayerInfo.layerProjectionViews.resize(stereoViews);
     renderLayerInfo.layerProjection.layerFlags =
         XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
         XR_COMPOSITION_LAYER_CORRECT_CHROMATIC_ABERRATION_BIT;
@@ -350,111 +313,18 @@ bool AppXR::RenderLayer(XRSystem::RenderLayerInfo &renderLayerInfo) {
     renderLayerInfo.layerProjection.viewCount = static_cast<uint32_t>(renderLayerInfo.layerProjectionViews.size());
     renderLayerInfo.layerProjection.views = renderLayerInfo.layerProjectionViews.data();
 
-    // transition imgui back
-    mXRSystem_->mpGraphicsContext_->transitionImageLayout(
-        imguiImage,
-        vk::Format::eR8Unorm,
-        vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        1
-    );
-
     return true;
 }
 
 void AppXR::InitImguiRender() {
-    // command buffer
-
-    vk::CommandBufferAllocateInfo allocInfo{};
-    allocInfo.commandPool = mpGraphicsContext_->mCommandPool_;
-    allocInfo.level = vk::CommandBufferLevel::ePrimary;
-    allocInfo.commandBufferCount = 1;
-
-    vk::Result result = mpGraphicsContext_->getDevice().allocateCommandBuffers(&allocInfo, &imguiCommandBuffer);
-    if (result != vk::Result::eSuccess) {
-        throw std::runtime_error("failed to allocate command buffers!");
-    }
-
-    // create renderpass
-    vk::AttachmentDescription colorAttachment{
-        .format = vk::Format::eR8G8B8A8Srgb,
-        .samples = vk::SampleCountFlagBits::e1,
-        .loadOp = vk::AttachmentLoadOp::eClear,
-        .storeOp = vk::AttachmentStoreOp::eStore,
-        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-        .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-        .initialLayout = vk::ImageLayout::eColorAttachmentOptimal,
-        .finalLayout = vk::ImageLayout::eColorAttachmentOptimal,
-    };
-
-    vk::AttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;  // Index in pAttachments array
-    colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
-
-    vk::SubpassDescription subpass{};
-    subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-
-    vk::SubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-    dependency.srcAccessMask = {};
-    dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-    dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
-
-    vk::RenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    mXRSystem_->mpGraphicsContext_->imguiRenderPass = mpGraphicsContext_->getDevice().createRenderPass(renderPassInfo);
-
-    mpGraphicsContext_->createImage(
-        imguiWidth,
-        imguiHeight,
-        1,
-        vk::SampleCountFlagBits::e1,
-        vk::Format::eR8G8B8A8Srgb,
-        vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-        vk::MemoryPropertyFlagBits::eDeviceLocal,
-        imguiImage,
-        imguiImageMemory
-    );
-
-    mXRSystem_->mpGraphicsContext_->transitionImageLayout(
-        imguiImage,
-        vk::Format::eR8G8B8A8Srgb,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        1
-    );
-
-    imguiImageView = mpGraphicsContext_->createImageView(
-        imguiImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, 1
-    );
-
-    VkImageView attachments[] = {
-        imguiImageView
-    };
-
-    VkFramebufferCreateInfo framebufferInfo{};
-    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = mXRSystem_->mpGraphicsContext_->imguiRenderPass;
-    framebufferInfo.attachmentCount = 1;
-    framebufferInfo.pAttachments = attachments;
-    framebufferInfo.width = imguiWidth;
-    framebufferInfo.height = imguiHeight;
-    framebufferInfo.layers = 1;  // usually 1 unless rendering to a 3D image or array layers
-
-    if (vkCreateFramebuffer(mpGraphicsContext_->getDevice(), &framebufferInfo, nullptr, &imguiFrameBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create framebuffer!");
-    }
+    // The GUI pass is recorded into the frame's command buffer (see RenderLayer).
+    // Disabled: a token target, only so ImGui (still initialised) has a render pass.
+    const uint32_t width = mImguiPanelEnabled_ ? imguiWidth : 16;
+    const uint32_t height = mImguiPanelEnabled_ ? imguiHeight : 16;
+    mImguiTarget_.create(*mpGraphicsContext_, width, height, {0.0f, 0.0f, 0.0f, 1.0f});
+    imguiImageView = mImguiTarget_.getSampledView();
+    // ImGui builds its pipeline against this pass.
+    mXRSystem_->mpGraphicsContext_->imguiRenderPass = mImguiTarget_.getRenderPass();
 }
 
 } // namespace clay

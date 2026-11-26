@@ -11,11 +11,22 @@
 #include "clay/graphics/common/BaseGraphicsContext.h"
 #include "clay/utils/xr/UtilsXR.h"
 #include "clay/graphics/common/UniformBuffer.h"
+// third party
+#include <array>
+#include <glm/glm.hpp>
 
 namespace clay {
 
 class GraphicsContextXR : public BaseGraphicsContext {
 public:
+    // Camera uniform layout for multiview rendering (mWorldLockedCameraUniform_ /
+    // mHeadLockedCameraUniform_): one view and projection per eye, which shaders index
+    // with gl_ViewIndex (GL_EXT_multiview).
+    struct StereoCamera {
+        glm::mat4 view[2];
+        glm::mat4 proj[2];
+    };
+
 
     struct BufferCreateInfo {
         VkBufferUsageFlagBits type;
@@ -234,7 +245,10 @@ public:
 
     ~GraphicsContextXR();
 
-    void CreateRenderPass(const std::vector <int64_t> &colorFormats, int64_t depthFormat);
+    // viewCount > 1 makes the pass a multiview pass: every draw is broadcast to that many
+    // array layers of the attachments (one per eye). Attachments are cleared on load.
+    void CreateRenderPass(const std::vector <int64_t> &colorFormats, int64_t depthFormat,
+                          uint32_t viewCount = 1);
 
     int64_t SelectColorSwapchainFormat(const std::vector <int64_t> &formats);
 
@@ -253,8 +267,11 @@ public:
 
     VkImage GetSwapchainImage(XrSwapchain swapchain, uint32_t index);
 
+    // Waits for the previous frame's submission, then starts recording cmdBuffer. Call
+    // before touching any per-frame CPU data the GPU reads (uniforms, bone palettes).
     void BeginRendering();
 
+    // Ends and submits cmdBuffer (signals `fence`). Does not wait for the GPU.
     void EndRendering();
 
     void SetBufferData(VkBuffer buffer, size_t offset, size_t size, void *data);
@@ -263,8 +280,11 @@ public:
 
     void ClearDepth(VkImageView imageView, float d);
 
+    // Begins the main render pass on these attachments, clearing them to the given values.
     void SetRenderAttachments(VkImageView *colorViews, size_t colorViewCount,
-                              VkImageView depthStencilView, uint32_t width, uint32_t height);
+                              VkImageView depthStencilView, uint32_t width, uint32_t height,
+                              const std::array<float, 4>& clearColor = {0.0f, 0.0f, 0.0f, 1.0f},
+                              float clearDepth = 1.0f);
 
     void SetViewports(Viewport *viewports, size_t count);
 
@@ -348,6 +368,7 @@ public:
     std::vector <std::tuple<vk::WriteDescriptorSet, vk::DescriptorBufferInfo, vk::DescriptorImageInfo>> writeDescSets;
 
     VkRenderPass imguiRenderPass = VK_NULL_HANDLE;
+    uint32_t mViewCount_ = 1; // views per render pass (2 = multiview stereo)
 
     std::unique_ptr<UniformBuffer> mWorldLockedCameraUniform_;
     std::unique_ptr<UniformBuffer> mHeadLockedCameraUniform_;

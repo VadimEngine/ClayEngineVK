@@ -44,7 +44,16 @@ public:
     // this view-projection are skipped. Off by default (everything draws); a scene
     // that renders the world from one camera should set it each frame before render().
     void setCullingViewProj(const glm::mat4& viewProj) {
-        mCullFrustum_ = Frustum::fromViewProj(viewProj);
+        mCullFrustums_[0] = Frustum::fromViewProj(viewProj);
+        mCullFrustumCount_ = 1;
+        mCullEnabled_ = true;
+    }
+    // Stereo (XR: both eyes drawn in one multiview pass): an entity is skipped only when
+    // it is outside BOTH eyes' view-projections.
+    void setCullingViewProj(const glm::mat4& leftViewProj, const glm::mat4& rightViewProj) {
+        mCullFrustums_[0] = Frustum::fromViewProj(leftViewProj);
+        mCullFrustums_[1] = Frustum::fromViewProj(rightViewProj);
+        mCullFrustumCount_ = 2;
         mCullEnabled_ = true;
     }
     void disableCulling() { mCullEnabled_ = false; }
@@ -122,7 +131,8 @@ private:
     clay::Handle<Mesh> mDebugMeshHandle_;
     glm::vec3 mWorldTint_ = glm::vec3(1.0f);
 
-    Frustum mCullFrustum_{};
+    Frustum mCullFrustums_[2]{};
+    uint32_t mCullFrustumCount_ = 0;
     bool mCullEnabled_ = false;
 
     std::vector<WorldCache> mWorldCache_;   // indexed by entity id

@@ -17,7 +17,10 @@ public:
 
     ~Texture();
 
-    void initialize(utils::ImageData& imageData);
+    // generateMipmaps: build the full mip chain on the GPU, so the texture minifies smoothly
+    // (no shimmer/aliasing on far or small surfaces, e.g. a star skybox) when sampled with a
+    // mipmapped sampler. Off by default (a single level, as before).
+    void initialize(utils::ImageData& imageData, bool generateMipmaps = false);
 
     void setSampler(vk::Sampler sampler);
 

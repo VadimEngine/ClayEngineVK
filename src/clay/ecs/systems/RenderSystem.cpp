@@ -286,10 +286,15 @@ void RenderSystem::render(EntityManager& entityManager, vk::CommandBuffer cmdBuf
         if (sig[ComponentType::MODEL]) {
             const ModelRenderable& renderable = entityManager.mModelRenderable[e];
             const WorldCache& cache = worldOf(entityManager, e);
-            if (mCullEnabled_ && cache.sphere.w >= 0.0f &&
-                !mCullFrustum_.intersectsSphere(glm::vec3(cache.sphere), cache.sphere.w)) {
-                ++culled;
-                continue;
+            if (mCullEnabled_ && renderable.mCullable_ && cache.sphere.w >= 0.0f) {
+                bool visible = false;
+                for (uint32_t f = 0; f < mCullFrustumCount_ && !visible; ++f) {
+                    visible = mCullFrustums_[f].intersectsSphere(glm::vec3(cache.sphere), cache.sphere.w);
+                }
+                if (!visible) {
+                    ++culled;
+                    continue;
+                }
             }
             for (const auto& element : mResources_[renderable.modelHandle].getElements()) {
                 Material& material = mResources_[element.materialHandle];

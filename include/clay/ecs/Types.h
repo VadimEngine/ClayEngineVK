@@ -84,6 +84,9 @@ struct ModelRenderable {
     // by effects that stamp the same mesh several times, e.g. a screen-space outline.
     // Only honoured on materials without an instanced variant.
     uint32_t instanceCount = 1;
+    // False: never frustum-culled - for things the vertex shader places independently of
+    // the entity's transform (e.g. a sky dome pinned to the far plane round the viewer).
+    bool mCullable_ = true;
 };
 
 struct SpriteRenderable {

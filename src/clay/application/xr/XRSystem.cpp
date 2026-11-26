@@ -1,5 +1,7 @@
 #ifdef CLAY_PLATFORM_XR
 #include "clay/application/xr/XRSystem.h"
+#include "clay/utils/common/Logger.h"
+#include <algorithm>
 
 namespace clay {
 
@@ -61,7 +63,8 @@ void XRSystem::initialize() {
     CreateSwapchains();
     mpGraphicsContext_->CreateRenderPass(
         {m_colorSwapchainInfos[0].swapchainFormat},
-        m_depthSwapchainInfos[0].swapchainFormat
+        m_depthSwapchainInfos[0].swapchainFormat,
+        static_cast<uint32_t>(m_viewConfigurationViews.size())
     );
 
     while (!mAndroidAppState_.windowInitialized && m_applicationRunning) {
@@ -90,7 +93,14 @@ void XRSystem::PollSystemEvents() {
         struct android_poll_source* source = nullptr;
         int events = 0;
         // The timeout depends on whether the application is active.
-        const int timeoutMilliseconds = (!mAndroidAppState_.resumed && !m_sessionRunning && mpAndroidApp_->destroyRequested == 0) ? -1 : 0;
+        // Active (resumed, session running): don't wait, a frame is due. Session stopped and
+        // paused: sleep until an event. Paused while the session still runs: the app doesn't
+        // render then (see AppXR::Run), so wake a few times a second to pump the XR events
+        // that end or resume the session, instead of spinning.
+        int timeoutMilliseconds = 0;
+        if (mpAndroidApp_->destroyRequested == 0 && !mAndroidAppState_.resumed) {
+            timeoutMilliseconds = m_sessionRunning ? 100 : -1;
+        }
         if (ALooper_pollOnce(timeoutMilliseconds, nullptr, &events, (void **) &source) >= 0) {
             if (source != nullptr) {
                 // this calls mpAndroidApp_->onAppCmd
@@ -297,6 +307,15 @@ void XRSystem::GetViewConfigurationViews() {
         ),
         "Failed to enumerate ViewConfiguration Views."
     )
+
+    // The rendered eye size: recommended x scale, within the runtime's maximum.
+    const XrViewConfigurationView& view = m_viewConfigurationViews[0];
+    const float scale = std::max(mResolutionScale_, 0.1f);
+    mEyeWidth_ = std::min(view.maxImageRectWidth, static_cast<uint32_t>(view.recommendedImageRectWidth * scale + 0.5f));
+    mEyeHeight_ = std::min(view.maxImageRectHeight, static_cast<uint32_t>(view.recommendedImageRectHeight * scale + 0.5f));
+    LOG_I("XR eye buffers: recommended %ux%u, max %ux%u, scale %.2f -> rendering %ux%u",
+          view.recommendedImageRectWidth, view.recommendedImageRectHeight,
+          view.maxImageRectWidth, view.maxImageRectHeight, scale, mEyeWidth_, mEyeHeight_);
 }
 
 void XRSystem::CreateSession() {
@@ -452,12 +471,15 @@ void XRSystem::CreateSwapchains() {
         DEBUG_BREAK;
     }
 
-    //Resize the SwapchainInfo to match the number of view in the View Configuration.
-    m_colorSwapchainInfos.resize(m_viewConfigurationViews.size());
-    m_depthSwapchainInfos.resize(m_viewConfigurationViews.size());
+    // Multiview: ONE color and ONE depth swapchain whose images are arrays with a layer per
+    // view (eye). The stereo render pass draws all layers at once; each projection view
+    // points at its layer through subImage.imageArrayIndex. All views of a stereo device
+    // share one size (view 0's is used).
+    const uint32_t viewCount = static_cast<uint32_t>(m_viewConfigurationViews.size());
+    m_colorSwapchainInfos.resize(1);
+    m_depthSwapchainInfos.resize(1);
 
-    // Per view, create a color and depth swapchain, and their associated image views.
-    for (size_t i = 0; i < m_viewConfigurationViews.size(); i++) {
+    for (size_t i = 0; i < 1; i++) {
         SwapchainInfo &colorSwapchainInfo = m_colorSwapchainInfos[i];
         SwapchainInfo &depthSwapchainInfo = m_depthSwapchainInfos[i];
 
@@ -468,10 +490,10 @@ void XRSystem::CreateSwapchains() {
         swapchainCI.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
         swapchainCI.format = mpGraphicsContext_->SelectColorSwapchainFormat(formats); // Use GraphicsAPI to select the first compatible format.
         swapchainCI.sampleCount = m_viewConfigurationViews[i].recommendedSwapchainSampleCount;  // Use the recommended values from the XrViewConfigurationView.
-        swapchainCI.width = m_viewConfigurationViews[i].recommendedImageRectWidth;
-        swapchainCI.height = m_viewConfigurationViews[i].recommendedImageRectHeight;
+        swapchainCI.width = mEyeWidth_;
+        swapchainCI.height = mEyeHeight_;
         swapchainCI.faceCount = 1;
-        swapchainCI.arraySize = 1;
+        swapchainCI.arraySize = viewCount;
         swapchainCI.mipCount = 1;
         OPENXR_CHECK(
             xrCreateSwapchain(m_session, &swapchainCI, &colorSwapchainInfo.swapchain),
@@ -484,10 +506,10 @@ void XRSystem::CreateSwapchains() {
         swapchainCI.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
         swapchainCI.format = mpGraphicsContext_->SelectDepthSwapchainFormat(formats);          // Use GraphicsAPI to select the first compatible format.
         swapchainCI.sampleCount = m_viewConfigurationViews[i].recommendedSwapchainSampleCount;  // Use the recommended values from the XrViewConfigurationView.
-        swapchainCI.width = m_viewConfigurationViews[i].recommendedImageRectWidth;
-        swapchainCI.height = m_viewConfigurationViews[i].recommendedImageRectHeight;
+        swapchainCI.width = mEyeWidth_;
+        swapchainCI.height = mEyeHeight_;
         swapchainCI.faceCount = 1;
-        swapchainCI.arraySize = 1;
+        swapchainCI.arraySize = viewCount;
         swapchainCI.mipCount = 1;
         OPENXR_CHECK(
             xrCreateSwapchain(m_session, &swapchainCI, &depthSwapchainInfo.swapchain),
@@ -537,34 +559,33 @@ void XRSystem::CreateSwapchains() {
             clay::GraphicsContextXR::ImageViewCreateInfo imageViewCI{};
             imageViewCI.image = mpGraphicsContext_->GetSwapchainImage(colorSwapchainInfo.swapchain, j);
             imageViewCI.type = clay::GraphicsContextXR::ImageViewCreateInfo::Type::RTV;
-            imageViewCI.view = vk::ImageViewType::e2D;
+            imageViewCI.view = vk::ImageViewType::e2DArray;
             imageViewCI.format = (vk::Format) colorSwapchainInfo.swapchainFormat;
             imageViewCI.aspect = vk::ImageAspectFlagBits::eColor;
             imageViewCI.baseMipLevel = 0;
             imageViewCI.levelCount = 1;
             imageViewCI.baseArrayLayer = 0;
-            imageViewCI.layerCount = 1;
+            imageViewCI.layerCount = viewCount;
             colorSwapchainInfo.imageViews.push_back(mpGraphicsContext_->CreateImageView(imageViewCI));
         }
         for (uint32_t j = 0; j < depthSwapchainImageCount; j++) {
             clay::GraphicsContextXR::ImageViewCreateInfo imageViewCI{};
             imageViewCI.image = mpGraphicsContext_->GetSwapchainImage(depthSwapchainInfo.swapchain, j);
             imageViewCI.type = clay::GraphicsContextXR::ImageViewCreateInfo::Type::DSV;
-            imageViewCI.view = vk::ImageViewType::e2D;
+            imageViewCI.view = vk::ImageViewType::e2DArray;
             imageViewCI.format = (vk::Format) depthSwapchainInfo.swapchainFormat;
             imageViewCI.aspect = vk::ImageAspectFlagBits::eDepth;
             imageViewCI.baseMipLevel = 0;
             imageViewCI.levelCount = 1;
             imageViewCI.baseArrayLayer = 0;
-            imageViewCI.layerCount = 1;
+            imageViewCI.layerCount = viewCount;
             depthSwapchainInfo.imageViews.push_back(mpGraphicsContext_->CreateImageView(imageViewCI));
         }
     }
 }
 
 void XRSystem::DestroySwapchains() {
-    // Per view in the view configuration:
-    for (size_t i = 0; i < m_viewConfigurationViews.size(); i++) {
+    for (size_t i = 0; i < m_colorSwapchainInfos.size(); i++) {
         SwapchainInfo &colorSwapchainInfo = m_colorSwapchainInfos[i];
         SwapchainInfo &depthSwapchainInfo = m_depthSwapchainInfos[i];
 

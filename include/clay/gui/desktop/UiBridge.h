@@ -13,8 +13,9 @@
 
 namespace clay {
 class BaseGraphicsContext;
+}
 
-namespace uibridge {
+namespace clay::uibridge {
 
 // Boot RmlUi on this graphics context. uiRoot is the game's UI folder: views (.rml), style
 // sheets (.rcss) and fonts load from it; images are named relative to its parent (the
@@ -26,11 +27,19 @@ bool init(BaseGraphicsContext* graphics, const char* uiRoot);
 // (default: std::filesystem). Android sets both to read the APK's assets.
 void setImageLoader(std::function<utils::ImageData(const std::string&)> loader);
 void setFileLister(std::function<std::vector<std::string>(const std::string&)> lister);
+// Desktop, before init(): read views, style sheets and fonts through the engine's file loader
+// (clay::Resources::setFileLoader) and not straight from disk, for an app whose resources are
+// not files (packed into the executable). Set the file lister and the image loader to match.
+void setFilesFromLoader(bool fromLoader);
 // A view's RML text passes through this before it is parsed (nullptr = as written): the
 // place to translate it. Relative paths in the view still resolve from its file.
 void setViewTextFilter(std::function<void(std::string&)> filter);
 
 bool isInitialized();
+
+// Size of the target the UI renders into, when that is not the swapchain (e.g. an XR
+// panel's offscreen image). 0, 0 = follow the swapchain (the default).
+void setTargetSize(uint32_t width, uint32_t height);
 
 // Scale of the RmlUi "dp" unit (density-independent pixels): 1 = 1 px. "px" stays physical.
 void setDpRatio(float ratio);
@@ -65,6 +74,9 @@ bool popCommand(char* out, int cap);
 // Value interop: find an element by id in the current view and get/set its value.
 // getters return false if the view/element is absent or the wrong type.
 void setText(const char* name, const char* utf8);           // TextBlock.Text
+// Replace an element's content with RML markup (e.g. a list built from app data). Buttons
+// inside report clicks through popCommand like any other. Skipped when unchanged.
+void setInnerRml(const char* name, const char* rml);
 bool getToggle(const char* name, bool* out);                // ToggleButton/CheckBox.IsChecked
 void setToggle(const char* name, bool value);
 bool getRangeValue(const char* name, float* out);           // Slider/ProgressBar.Value
@@ -115,4 +127,4 @@ void focusElement(const char* name);                        // activate view + f
 
 void shutdown();
 
-} } // namespace clay::uibridge
+} // namespace clay::uibridge

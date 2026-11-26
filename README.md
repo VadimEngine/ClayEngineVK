@@ -10,7 +10,7 @@ ClayEngineVK is a C++20 game engine built on Vulkan. It compiles as a static lib
 | Graphics | Vulkan context per platform, meshes, materials, pipelines, textures, cameras, fonts, skybox, tilemaps, 2D sprite animation, skeletal animation | `clay/graphics` |
 | ECS | Entities and components (transform, model, sprite, text, 2D and 3D animation, colliders, physics bodies) with render, collision and physics systems | `clay/ecs` |
 | Physics | 2D bodies and collision events in the ECS, and PhysX rigid bodies for 3D | `clay/ecs/systems` |
-| Audio | OpenAL playback: loaded sounds, sources, music | `clay/audio` |
+| Audio | OpenAL playback: loaded sounds, sources, music. Reads WAV and other uncompressed formats, and Ogg Vorbis for compressed music | `clay/audio` |
 | UI | Dear ImGui for debug tools; optional RmlUi (HTML/CSS-like views) for game menus and HUDs | `clay/gui` |
 | Utilities | Logging, file and image loading, a frame profiler | `clay/utils` |
 
@@ -154,7 +154,7 @@ All are submodules in `thirdparty/`.
 | OpenXR-SDK-Source | XR platforms |
 | PhysX | 3D physics |
 | RmlUi | Game UI (optional, `CLAY_ENABLE_RMLUI`) |
-| stb | Loading and saving images |
+| stb | Loading and saving images; decoding Ogg Vorbis audio |
 | Vulkan-Hpp | C++ bindings for Vulkan |
 
 ## Demos

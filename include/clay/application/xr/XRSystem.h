@@ -96,6 +96,13 @@ public:
     XrViewConfigurationType m_viewConfiguration = XR_VIEW_CONFIGURATION_TYPE_MAX_ENUM;
     std::vector<XrViewConfigurationView> m_viewConfigurationViews;
 
+    // Eye-buffer resolution: the runtime's recommended size times this, clamped to its
+    // maximum. > 1 supersamples (sharper text and edges, more GPU). Set before initialize().
+    float mResolutionScale_ = 1.0f;
+    // The per-eye size actually rendered (set in initialize()).
+    uint32_t mEyeWidth_ = 0;
+    uint32_t mEyeHeight_ = 0;
+
     std::vector<SwapchainInfo> m_colorSwapchainInfos = {};
     std::vector<SwapchainInfo> m_depthSwapchainInfos = {};
 

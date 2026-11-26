@@ -181,6 +181,10 @@ if(CLAY_PLATFORM_DESKTOP)
         ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stb
     )
 endif()
+# stb_vorbis (Ogg Vorbis decoding, clay/audio/Audio.cpp) is needed on every platform.
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stb
+)
 
 # Define common libraries
 set(CLAY_COMMON_LIBS
@@ -239,7 +243,9 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_NO_STRUCT_CONSTRUCT
 
 if(CLAY_PLATFORM_XR)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_XR)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC _DEBUG)
+    # PhysX needs exactly one of _DEBUG / NDEBUG: optimised configs (the APK's release
+    # variant = RelWithDebInfo) already define NDEBUG.
+    target_compile_definitions(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:_DEBUG>)
 endif()
 if(CLAY_PLATFORM_ANDROID)
     target_compile_definitions(${PROJECT_NAME} PUBLIC CLAY_PLATFORM_ANDROID)
@@ -252,10 +258,10 @@ if(CLAY_PLATFORM_DESKTOP)
 endif()
 
 # ---------------------------------------------------------------------------
-# RmlUi (optional, desktop + Android / Vulkan): HTML/CSS-like UI, statically linked, using the engine's
+# RmlUi (optional, desktop + Android + XR / Vulkan): HTML/CSS-like UI, statically linked, using the engine's
 # FreeType. The Vulkan renderer for it is the engine's own (RmlUiRenderBridge.cpp).
 # ---------------------------------------------------------------------------
-if(CLAY_ENABLE_RMLUI AND (CLAY_PLATFORM_DESKTOP OR CLAY_PLATFORM_ANDROID))
+if(CLAY_ENABLE_RMLUI AND (CLAY_PLATFORM_DESKTOP OR CLAY_PLATFORM_ANDROID OR CLAY_PLATFORM_XR))
     if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/RmlUi/CMakeLists.txt)
         message(FATAL_ERROR "CLAY_ENABLE_RMLUI=ON but thirdparty/RmlUi is missing (git submodule update --init thirdparty/RmlUi).")
     endif()

@@ -1,4 +1,5 @@
 #pragma once
+#include <deque>
 // standard lib
 #include <filesystem>
 #include <functional>
@@ -37,7 +38,10 @@ public:
 
     private:
         BaseGraphicsContext& mGraphicsContext_;
-        std::vector<T> resources;
+        // A deque, not a vector: adding a resource never moves the existing ones, so
+        // references into the pool stay valid (e.g. a Material keeps a reference to its
+        // PipelineResource - a vector reallocating on growth left it dangling).
+        std::deque<T> resources;
         // track when a resource slot is resused, if a older generation is used, then throw error
         std::vector<uint32_t> generations; 
         // stack of vacant indices

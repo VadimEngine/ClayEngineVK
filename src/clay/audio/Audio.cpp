@@ -6,6 +6,9 @@
 // third party
 #include <AL/alext.h>
 #include <sndfile.h>
+// (Declarations only here; the decoder itself is compiled at the end of this file.)
+#define STB_VORBIS_HEADER_ONLY
+#include <stb_vorbis.c>
 // class
 #include "clay/audio/Audio.h"
 #include "clay/utils/common/Logger.h"
@@ -58,7 +61,51 @@ sf_count_t vio_write(const void* ptr, sf_count_t count, void* user_data) {
     return 0;
 }
 
+namespace {
+
+// An Ogg file starts with the four letters "OggS".
+bool isOgg(const utils::FileData& fileData) {
+    return fileData.size >= 4 && std::memcmp(fileData.data.get(), "OggS", 4) == 0;
+}
+
+// Ogg Vorbis (compressed music): decoded whole to 16-bit samples with stb_vorbis, which
+// needs no other library. (The engine's libsndfile is built without the Ogg libraries, so
+// it reads WAV and other uncompressed formats only.)
+unsigned int loadOggVorbis(const utils::FileData& fileData) {
+    int channels = 0, sampleRate = 0;
+    short* samples = nullptr;
+    const int frames = stb_vorbis_decode_memory(fileData.data.get(), static_cast<int>(fileData.size), &channels,
+                                                &sampleRate, &samples);
+    if (frames <= 0 || !samples) {
+        free(samples);
+        throw std::runtime_error("Error decoding Ogg Vorbis audio");
+    }
+    const ALenum format = channels == 1 ? AL_FORMAT_MONO16 : channels == 2 ? AL_FORMAT_STEREO16 : AL_NONE;
+    if (format == AL_NONE) {
+        free(samples);
+        LOG_E("Unsupported channel count: %d", channels);
+        throw std::runtime_error("Unsupported channel count");
+    }
+    ALuint buffer = 0;
+    alGenBuffers(1, &buffer);
+    alBufferData(buffer, format, samples, static_cast<ALsizei>(frames) * channels * static_cast<ALsizei>(sizeof(short)),
+                 sampleRate);
+    free(samples);
+    if (const ALenum err = alGetError(); err != AL_NO_ERROR) {
+        LOG_E("OpenAL Error: %s", alGetString(err));
+        if (buffer && alIsBuffer(buffer)) alDeleteBuffers(1, &buffer);
+        throw std::runtime_error("OpenAL error");
+    }
+    return buffer;
+}
+
+} // namespace
+
 Audio::Audio(const utils::FileData& fileData) {
+    if (isOgg(fileData)) {
+        mId_ = loadOggVorbis(fileData);
+        return;
+    }
     ALenum err, format;
     ALuint buffer;
     SNDFILE* sndfile;
@@ -167,3 +214,25 @@ int Audio::getId() {
 }
 
 } // namespace clay
+
+// The Ogg Vorbis decoder (stb_vorbis, public domain): compiled here, after everything else,
+// because it defines short macro names (L, C, R) that must not reach other code.
+#undef STB_VORBIS_HEADER_ONLY
+#if defined(_MSC_VER)
+#pragma warning(push, 0)
+#elif defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wall"
+#pragma GCC diagnostic ignored "-Wextra"
+#endif
+#include <stb_vorbis.c>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif

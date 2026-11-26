@@ -12,8 +12,14 @@
 
 namespace clay {
 
-// disable validation when using RenderDoc
+// Vulkan validation layers + debug messenger: Debug builds only (as GraphicsContextDesktop).
+// Release / RelWithDebInfo (NDEBUG) skip them - they cost a lot of CPU every frame. Set it
+// to false by hand to profile a Debug build, or when using RenderDoc.
+#ifdef NDEBUG
+bool enableValidation = false;
+#else
 bool enableValidation = true;
+#endif
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
@@ -347,12 +353,16 @@ GraphicsContextXR::GraphicsContextXR(XrInstance m_xrInstance, XrSystemId systemI
     ai.applicationVersion = 1;
     ai.pEngineName = "OpenXR Tutorial - Vulkan Engine";
     ai.engineVersion = 1;
-    ai.apiVersion = VK_MAKE_API_VERSION(
-        0,
-        XR_VERSION_MAJOR(graphicsRequirements.minApiVersionSupported),
-        XR_VERSION_MINOR(graphicsRequirements.minApiVersionSupported),
-        0
-    );
+    // Multiview (both eyes in one pass) is core in Vulkan 1.1: ask for at least that.
+    {
+        uint32_t major = XR_VERSION_MAJOR(graphicsRequirements.minApiVersionSupported);
+        uint32_t minor = XR_VERSION_MINOR(graphicsRequirements.minApiVersionSupported);
+        if (major < 1 || (major == 1 && minor < 1)) {
+            major = 1;
+            minor = 1;
+        }
+        ai.apiVersion = VK_MAKE_API_VERSION(0, major, minor, 0);
+    }
 
     uint32_t instanceExtensionCount = 0;
 
@@ -369,7 +379,9 @@ GraphicsContextXR::GraphicsContextXR(XrInstance m_xrInstance, XrSystemId systemI
         }
     }
 
-    activeInstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    if (enableValidation) {
+        activeInstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME); // for the messenger
+    }
 
     if (enableValidation) {
         activeInstanceLayers = {"VK_LAYER_KHRONOS_validation"};
@@ -377,8 +389,9 @@ GraphicsContextXR::GraphicsContextXR(XrInstance m_xrInstance, XrSystemId systemI
 
     vk::InstanceCreateInfo instanceCI;
     instanceCI.pNext = nullptr; // this was commented out
+    // Outlives createInstance below (pNext points at it).
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
     if (enableValidation) {
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         populateDebugMessengerCreateInfo(debugCreateInfo);
         instanceCI.pNext = &debugCreateInfo;
     }
@@ -470,8 +483,18 @@ GraphicsContextXR::GraphicsContextXR(XrInstance m_xrInstance, XrSystemId systemI
 
     vk::PhysicalDeviceFeatures features = mPhysicalDevice_.getFeatures();
 
+    // Multiview: required, the stereo render pass draws both eyes at once.
+    {
+        auto supported = mPhysicalDevice_.getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceMultiviewFeatures>();
+        if (!supported.get<vk::PhysicalDeviceMultiviewFeatures>().multiview) {
+            throw std::runtime_error("Vulkan multiview is not supported on this device");
+        }
+    }
+    vk::PhysicalDeviceMultiviewFeatures multiviewFeatures{};
+    multiviewFeatures.multiview = VK_TRUE;
+
     vk::DeviceCreateInfo deviceCI;
-    deviceCI.pNext = nullptr;
+    deviceCI.pNext = &multiviewFeatures;
     deviceCI.flags = {};
     deviceCI.queueCreateInfoCount = static_cast<uint32_t>(deviceQueueCIs.size());
     deviceCI.pQueueCreateInfos = deviceQueueCIs.data();
@@ -523,13 +546,13 @@ GraphicsContextXR::GraphicsContextXR(XrInstance m_xrInstance, XrSystemId systemI
 
     mWorldLockedCameraUniform_ = std::make_unique<UniformBuffer>(
         *this,
-        sizeof(glm::mat4) * 2,
+        sizeof(StereoCamera),
         nullptr
     );
 
     mHeadLockedCameraUniform_ = std::make_unique<UniformBuffer>(
         *this,
-        sizeof(glm::mat4) * 2,
+        sizeof(StereoCamera),
         nullptr
     );
 }
@@ -556,7 +579,9 @@ void GraphicsContextXR::setupDebugMessenger() {
     }
 }
 
-void GraphicsContextXR::CreateRenderPass(const std::vector<int64_t>& colorFormats, int64_t depthFormat) {
+void GraphicsContextXR::CreateRenderPass(const std::vector<int64_t>& colorFormats, int64_t depthFormat,
+                                         uint32_t viewCount) {
+    mViewCount_ = viewCount;
     // RenderPass
     std::vector<vk::AttachmentDescription> attachmentDescriptions{};
     std::vector<vk::AttachmentReference> colorAttachmentReferences{};
@@ -566,12 +591,14 @@ void GraphicsContextXR::CreateRenderPass(const std::vector<int64_t>& colorFormat
         desc.flags = {};
         desc.format = static_cast<vk::Format>(colorFormat);
         desc.samples = vk::SampleCountFlagBits::e1;
-        desc.loadOp = vk::AttachmentLoadOp::eLoad;
+        // Clear on load: on a tiled GPU this costs nothing, unlike loading the old contents.
+        desc.loadOp = vk::AttachmentLoadOp::eClear;
         desc.storeOp = vk::AttachmentStoreOp::eStore;
         desc.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
         desc.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        desc.initialLayout = vk::ImageLayout::eColorAttachmentOptimal;
-        desc.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        // Cleared on load, so the previous contents/layout don't matter.
+        desc.initialLayout = vk::ImageLayout::eUndefined;
+        desc.finalLayout = vk::ImageLayout::eColorAttachmentOptimal; // what OpenXR expects on release
 
         attachmentDescriptions.emplace_back(desc);
         colorAttachmentReferences.push_back({
@@ -585,11 +612,12 @@ void GraphicsContextXR::CreateRenderPass(const std::vector<int64_t>& colorFormat
         depthDesc.flags = {};
         depthDesc.format = static_cast<vk::Format>(depthFormat);
         depthDesc.samples = vk::SampleCountFlagBits::e1;
-        depthDesc.loadOp = vk::AttachmentLoadOp::eLoad;
-        depthDesc.storeOp = vk::AttachmentStoreOp::eStore;
-        depthDesc.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        depthDesc.loadOp = vk::AttachmentLoadOp::eClear;
+        // Depth isn't submitted to the compositor, so it never needs to leave tile memory.
+        depthDesc.storeOp = vk::AttachmentStoreOp::eDontCare;
+        depthDesc.stencilLoadOp = vk::AttachmentLoadOp::eClear;
         depthDesc.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        depthDesc.initialLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        depthDesc.initialLayout = vk::ImageLayout::eUndefined;
         depthDesc.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
 
         attachmentDescriptions.emplace_back(depthDesc);
@@ -614,10 +642,16 @@ void GraphicsContextXR::CreateRenderPass(const std::vector<int64_t>& colorFormat
     vk::SubpassDependency subpassDependency;
     subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     subpassDependency.dstSubpass = 0;
-    subpassDependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-    subpassDependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    subpassDependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                                     vk::PipelineStageFlagBits::eEarlyFragmentTests |
+                                     vk::PipelineStageFlagBits::eLateFragmentTests;
+    subpassDependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                                     vk::PipelineStageFlagBits::eEarlyFragmentTests |
+                                     vk::PipelineStageFlagBits::eLateFragmentTests;
     subpassDependency.srcAccessMask = {};
-    subpassDependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
+    subpassDependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite |
+                                      vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                                      vk::AccessFlagBits::eDepthStencilAttachmentWrite;
     subpassDependency.dependencyFlags = {};
 
     vk::RenderPassCreateInfo renderPassCI;
@@ -629,6 +663,18 @@ void GraphicsContextXR::CreateRenderPass(const std::vector<int64_t>& colorFormat
     renderPassCI.pSubpasses = &subpassDescription;
     renderPassCI.dependencyCount = 1;
     renderPassCI.pDependencies = &subpassDependency;
+
+    // Multiview: view i renders to array layer i; the views are correlated (stereo), which
+    // lets the driver share work between them.
+    const uint32_t viewMask = (viewCount >= 32) ? 0xFFFFFFFFu : ((1u << viewCount) - 1u);
+    vk::RenderPassMultiviewCreateInfo multiviewCI{};
+    multiviewCI.subpassCount = 1;
+    multiviewCI.pViewMasks = &viewMask;
+    multiviewCI.correlationMaskCount = 1;
+    multiviewCI.pCorrelationMasks = &viewMask;
+    if (viewCount > 1) {
+        renderPassCI.pNext = &multiviewCI;
+    }
     mRenderPass_ = mDevice_.createRenderPass(renderPassCI);
 }
 
@@ -690,6 +736,7 @@ void GraphicsContextXR::DestroyImageView(VkImageView& imageView) {
 void GraphicsContextXR::BeginRendering() {
     mDevice_.waitForFences(fence, true, UINT64_MAX);
     mDevice_.resetFences(fence);
+    beginFrame(0); // one frame in flight: always slot 0; advances getFrameSerial()
     for (const auto& descSet : cmdBufferDescriptorSets[cmdBuffer]) {
         mDevice_.freeDescriptorSets(mDescriptorPool_, { descSet });
     }
@@ -878,7 +925,9 @@ void GraphicsContextXR::SetRenderAttachments(VkImageView* colorViews,
                                         size_t colorViewCount,
                                         VkImageView depthStencilView,
                                         uint32_t width,
-                                        uint32_t height) {
+                                        uint32_t height,
+                                        const std::array<float, 4>& clearColor,
+                                        float clearDepth) {
     if (inRenderPass) {
         cmdBuffer.endRenderPass();
     }
@@ -913,8 +962,20 @@ void GraphicsContextXR::SetRenderAttachments(VkImageView* colorViews,
         framebufferCI.width,
         framebufferCI.height
     };
-    renderPassBegin.clearValueCount = 0;
-    renderPassBegin.pClearValues = nullptr;
+    // The render pass clears every attachment on load (see CreateRenderPass).
+    std::vector<vk::ClearValue> clearValues;
+    for (size_t i = 0; i < colorViewCount; i++) {
+        vk::ClearValue value;
+        value.color = vk::ClearColorValue(clearColor);
+        clearValues.push_back(value);
+    }
+    if (depthStencilView) {
+        vk::ClearValue value;
+        value.depthStencil = vk::ClearDepthStencilValue{clearDepth, 0};
+        clearValues.push_back(value);
+    }
+    renderPassBegin.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassBegin.pClearValues = clearValues.data();
     cmdBuffer.beginRenderPass(renderPassBegin, vk::SubpassContents::eInline);
     inRenderPass = true;
 }

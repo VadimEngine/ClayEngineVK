@@ -7,8 +7,8 @@
 //   - setVisible() toggles the class "hidden"; setEnabled() toggles the class "disabled"
 //   - setRangeValue() drives a <progress> (value) or an <input type="range">
 //   - body has pointer-events: none so only real panels count as "the mouse is over the UI"
-// Built for desktop and Android (the folder name is historical).
-#if (defined(CLAY_PLATFORM_DESKTOP) || defined(CLAY_PLATFORM_ANDROID)) && defined(CLAY_ENABLE_RMLUI)
+// Built for desktop, Android and XR (the folder name is historical).
+#if (defined(CLAY_PLATFORM_DESKTOP) || defined(CLAY_PLATFORM_ANDROID) || defined(CLAY_PLATFORM_XR)) && defined(CLAY_ENABLE_RMLUI)
 
 #include "clay/gui/desktop/UiBridge.h"
 #include "clay/application/common/Resources.h"
@@ -33,7 +33,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace clay { namespace uibridge {
+namespace clay::uibridge {
 
 namespace {
 
@@ -133,9 +133,16 @@ public:
         flushReleases(false);
         ensurePipeline(renderPass, samples);
         mCmd_ = cmd;
-        const auto dims = mGc_->getFrameDimensions();
-        mWidth_ = static_cast<uint32_t>(dims.first);
-        mHeight_ = static_cast<uint32_t>(dims.second);
+        // The UI is drawn either straight onto the swapchain or into an offscreen target
+        // (XR panels), whose size the owner sets with setTargetSize().
+        if (targetWidth > 0 && targetHeight > 0) {
+            mWidth_ = targetWidth;
+            mHeight_ = targetHeight;
+        } else {
+            const auto dims = mGc_->getFrameDimensions();
+            mWidth_ = static_cast<uint32_t>(dims.first);
+            mHeight_ = static_cast<uint32_t>(dims.second);
+        }
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, mPipeline_);
         cmd.setViewport(0, vk::Viewport{0.0f, 0.0f, static_cast<float>(mWidth_), static_cast<float>(mHeight_), 0.0f, 1.0f});
         mScissorEnabled_ = false;
@@ -537,6 +544,10 @@ private:
     }
 
     BaseGraphicsContext* mGc_ = nullptr;
+public:
+    uint32_t targetWidth = 0;   // 0 = the swapchain size (see setTargetSize)
+    uint32_t targetHeight = 0;
+private:
     vk::DescriptorSetLayout mSetLayout_;
     vk::DescriptorPool mPool_;
     vk::Sampler mSampler_;
@@ -582,10 +593,11 @@ public:
     }
 };
 
-#ifdef CLAY_PLATFORM_ANDROID
 // =================================================================================================
-// File interface (Android): views, style sheets and fonts are APK assets, read whole through
-// the engine's file loader (clay::Resources) and served from memory.
+// File interface: views, style sheets and fonts read whole through the engine's file loader
+// (clay::Resources) and served from memory. Always used on Android / XR, where they are APK
+// assets; on desktop only when the app asks (setFilesFromLoader: resources packed into the
+// executable), otherwise RmlUi opens the files itself.
 // =================================================================================================
 class Files final : public Rml::FileInterface {
 public:
@@ -624,7 +636,7 @@ private:
     };
 };
 Files gFiles;
-#endif
+bool gFilesFromLoader = false;
 
 // =================================================================================================
 // Bridge state
@@ -739,9 +751,10 @@ bool init(BaseGraphicsContext* graphics, const char* uiRoot) {
     gRenderer.init(gGc);
     Rml::SetSystemInterface(&gSystem);
     Rml::SetRenderInterface(&gRenderer);
-#ifdef CLAY_PLATFORM_ANDROID
-    Rml::SetFileInterface(&gFiles);
+#if defined(CLAY_PLATFORM_ANDROID) || defined(CLAY_PLATFORM_XR)
+    gFilesFromLoader = true;
 #endif
+    if (gFilesFromLoader) Rml::SetFileInterface(&gFiles);
     if (!Rml::Initialise()) { LOG_E("RmlUi: Initialise failed"); return false; }
 
     const auto dims = graphics->getFrameDimensions();
@@ -771,6 +784,11 @@ bool init(BaseGraphicsContext* graphics, const char* uiRoot) {
 
 bool isInitialized() { return gInitialized; }
 
+void setTargetSize(uint32_t width, uint32_t height) {
+    gRenderer.targetWidth = width;
+    gRenderer.targetHeight = height;
+}
+
 void setDpRatio(float ratio) {
     if (!gContext || ratio <= 0.0f) return;
     if (std::abs(gContext->GetDensityIndependentPixelRatio() - ratio) > 1e-4f) gContext->SetDensityIndependentPixelRatio(ratio);
@@ -779,6 +797,7 @@ void setDpRatio(float ratio) {
 void setImageLoader(std::function<utils::ImageData(const std::string&)> loader) { gImageLoader = std::move(loader); }
 void setFileLister(std::function<std::vector<std::string>(const std::string&)> lister) { gFileLister = std::move(lister); }
 void setViewTextFilter(std::function<void(std::string&)> filter) { gViewTextFilter = std::move(filter); }
+void setFilesFromLoader(bool fromLoader) { gFilesFromLoader = fromLoader; }
 
 namespace {
 
@@ -802,7 +821,7 @@ bool loadView(const char* viewFile, uint32_t width, uint32_t height) {
     unloadView();
     const std::string path = gUiRoot + "/" + viewFile;
 #ifdef CLAY_PLATFORM_DESKTOP
-    if (!std::filesystem::exists(path)) { LOG_E("RmlUi: no such view %s", path.c_str()); return false; }
+    if (!gFilesFromLoader && !std::filesystem::exists(path)) { LOG_E("RmlUi: no such view %s", path.c_str()); return false; }
 #endif
     gContext->SetDimensions(Rml::Vector2i(static_cast<int>(std::max(width, 1u)), static_cast<int>(std::max(height, 1u))));
     std::string rml;
@@ -934,6 +953,12 @@ void setText(const char* name, const char* utf8) {
     e->SetInnerRML(rml);
 }
 
+void setInnerRml(const char* name, const char* rml) {
+    Rml::Element* e = find(name);
+    if (!e || !rml) return;
+    if (unchanged("rml", name, rml)) return;
+    e->SetInnerRML(rml);
+}
 bool getToggle(const char* name, bool* out) {
     Rml::Element* e = find(name);
     if (!e || !out) return false;
@@ -1105,6 +1130,6 @@ void shutdown() {
     gInitialized = false;
 }
 
-} } // namespace clay::uibridge
+} // namespace clay::uibridge
 
-#endif // (CLAY_PLATFORM_DESKTOP || CLAY_PLATFORM_ANDROID) && CLAY_ENABLE_RMLUI
+#endif // (CLAY_PLATFORM_DESKTOP || CLAY_PLATFORM_ANDROID || CLAY_PLATFORM_XR) && CLAY_ENABLE_RMLUI

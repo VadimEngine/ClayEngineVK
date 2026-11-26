@@ -71,6 +71,9 @@ public:
 
     // Frustum culling for render() (see RenderSystem::setCullingViewProj).
     void setCullingViewProj(const glm::mat4& viewProj) { mRenderSystem_.setCullingViewProj(viewProj); }
+    void setCullingViewProj(const glm::mat4& leftViewProj, const glm::mat4& rightViewProj) {
+        mRenderSystem_.setCullingViewProj(leftViewProj, rightViewProj);
+    }
 
     // for now, have update/render in here?
     void render(vk::CommandBuffer cmdBuffer);

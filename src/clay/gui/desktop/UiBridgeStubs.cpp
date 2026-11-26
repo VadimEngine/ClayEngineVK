@@ -3,12 +3,14 @@
 #if !defined(CLAY_ENABLE_RMLUI)
 #include "clay/gui/desktop/UiBridge.h"
 
-namespace clay { namespace uibridge {
+namespace clay::uibridge {
 bool init(BaseGraphicsContext*, const char*) { return false; }
 void setImageLoader(std::function<utils::ImageData(const std::string&)>) {}
 void setFileLister(std::function<std::vector<std::string>(const std::string&)>) {}
 void setViewTextFilter(std::function<void(std::string&)>) {}
+void setFilesFromLoader(bool) {}
 bool isInitialized() { return false; }
+void setTargetSize(uint32_t, uint32_t) {}
 void setDpRatio(float) {}
 bool loadView(const char*, uint32_t, uint32_t) { return false; }
 void unloadView() {}
@@ -24,6 +26,7 @@ bool scrollAt(int, int, float) { return false; }
 void setUiSoundCallbacks(void (*)(), void (*)()) {}
 bool popCommand(char*, int) { return false; }
 void setText(const char*, const char*) {}
+void setInnerRml(const char*, const char*) {}
 bool getToggle(const char*, bool*) { return false; }
 void setToggle(const char*, bool) {}
 bool getRangeValue(const char*, float*) { return false; }
@@ -49,6 +52,6 @@ void focusElement(const char*) {}
 void shutdown() {}
 bool createDynamicImage(const char*, uint32_t, uint32_t) { return false; }
 void updateDynamicImage(const char*, const void*, uint32_t, uint32_t) {}
-} }
+} // namespace clay::uibridge
 
 #endif // !CLAY_ENABLE_RMLUI
